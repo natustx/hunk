@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AgentAnnotation, DiffFile, LayoutMode } from "../../core/types";
 import { AgentCard } from "../components/panes/AgentCard";
 import { annotationLocationLabel, type VisibleAgentNote } from "../lib/agentAnnotations";
@@ -890,58 +890,78 @@ export function PierreDiffView({
   scrollable?: boolean;
 }) {
   const [highlighted, setHighlighted] = useState<HighlightedDiffCode | null>(null);
-  const [highlightedFileId, setHighlightedFileId] = useState<string | null>(null);
+  const [highlightedCacheKey, setHighlightedCacheKey] = useState<string | null>(null);
   const highlightedCacheRef = useRef(new Map<string, HighlightedDiffCode>());
+  const highlightPromiseRef = useRef(new Map<string, Promise<HighlightedDiffCode>>());
+  const appearanceCacheKey = file ? `${theme.appearance}:${file.id}` : null;
 
-  useEffect(() => {
-    if (!file) {
+  // Start the async highlight request as soon as render knows which file/appearance is needed.
+  const pendingHighlight = useMemo(() => {
+    if (!file || !appearanceCacheKey || highlightedCacheRef.current.has(appearanceCacheKey)) {
+      return null;
+    }
+
+    const existing = highlightPromiseRef.current.get(appearanceCacheKey);
+    if (existing) {
+      return existing;
+    }
+
+    const pending = loadHighlightedDiff(file, theme.appearance);
+    highlightPromiseRef.current.set(appearanceCacheKey, pending);
+    return pending;
+  }, [appearanceCacheKey, file, theme.appearance]);
+
+  useLayoutEffect(() => {
+    if (!file || !appearanceCacheKey) {
       setHighlighted(null);
-      setHighlightedFileId(null);
+      setHighlightedCacheKey(null);
       return;
     }
 
-    if (highlightedFileId === file.id) {
+    if (highlightedCacheKey === appearanceCacheKey) {
       return;
     }
 
-    const cached = highlightedCacheRef.current.get(file.id);
+    const cached = highlightedCacheRef.current.get(appearanceCacheKey);
     if (cached) {
       setHighlighted(cached);
-      setHighlightedFileId(file.id);
+      setHighlightedCacheKey(appearanceCacheKey);
       return;
     }
 
     let cancelled = false;
     setHighlighted(null);
 
-    loadHighlightedDiff(file)
-      .then((nextHighlighted) => {
+    pendingHighlight
+      ?.then((nextHighlighted) => {
         if (cancelled) {
           return;
         }
 
-        highlightedCacheRef.current.set(file.id, nextHighlighted);
+        highlightPromiseRef.current.delete(appearanceCacheKey);
+        highlightedCacheRef.current.set(appearanceCacheKey, nextHighlighted);
         setHighlighted(nextHighlighted);
-        setHighlightedFileId(file.id);
+        setHighlightedCacheKey(appearanceCacheKey);
       })
       .catch(() => {
         if (cancelled) {
           return;
         }
 
+        highlightPromiseRef.current.delete(appearanceCacheKey);
         const fallback = {
           deletionLines: [],
           additionLines: [],
         } satisfies HighlightedDiffCode;
-        highlightedCacheRef.current.set(file.id, fallback);
+        highlightedCacheRef.current.set(appearanceCacheKey, fallback);
         setHighlighted(fallback);
-        setHighlightedFileId(file.id);
+        setHighlightedCacheKey(appearanceCacheKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [file, highlightedFileId]);
+  }, [appearanceCacheKey, file, highlightedCacheKey, pendingHighlight]);
 
   if (!file) {
     return (
@@ -960,7 +980,12 @@ export function PierreDiffView({
   }
 
   // Prefer cached highlights during render so revisiting a file can paint immediately.
-  const resolvedHighlighted = highlightedFileId === file.id ? highlighted : (highlightedCacheRef.current.get(file.id) ?? null);
+  const resolvedHighlighted =
+    appearanceCacheKey && highlightedCacheKey === appearanceCacheKey
+      ? highlighted
+      : appearanceCacheKey
+        ? (highlightedCacheRef.current.get(appearanceCacheKey) ?? null)
+        : null;
   const rows = useMemo(
     () => (layout === "split" ? buildSplitRows(file, resolvedHighlighted, theme) : buildStackRows(file, resolvedHighlighted, theme)),
     [file, layout, resolvedHighlighted, theme],

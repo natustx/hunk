@@ -1,11 +1,4 @@
-import {
-  cleanLastNewline,
-  getHighlighterOptions,
-  getSharedHighlighter,
-  renderDiffWithHighlighter,
-  type FileDiffMetadata,
-  type Hunk,
-} from "@pierre/diffs";
+import type { FileDiffMetadata, Hunk } from "@pierre/diffs";
 import type { DiffFile } from "../../core/types";
 import type { AppTheme } from "../themes";
 
@@ -14,11 +7,35 @@ const PIERRE_THEME = {
   dark: "pierre-dark",
 } as const;
 
-const PIERRE_RENDER_OPTIONS = {
-  theme: PIERRE_THEME,
-  tokenizeMaxLineLength: 1_000,
-  lineDiffType: "word-alt" as const,
-};
+/** Resolve the single Pierre theme name needed for the current appearance. */
+function pierreThemeName(appearance: AppTheme["appearance"]) {
+  return PIERRE_THEME[appearance];
+}
+
+const PIERRE_RENDER_OPTIONS_BY_APPEARANCE = {
+  light: {
+    theme: pierreThemeName("light"),
+    tokenizeMaxLineLength: 1_000,
+    lineDiffType: "word-alt" as const,
+  },
+  dark: {
+    theme: pierreThemeName("dark"),
+    tokenizeMaxLineLength: 1_000,
+    lineDiffType: "word-alt" as const,
+  },
+} as const;
+
+/** Reuse the render options for one appearance so startup work avoids extra object churn. */
+function pierreRenderOptions(appearance: AppTheme["appearance"]) {
+  return PIERRE_RENDER_OPTIONS_BY_APPEARANCE[appearance];
+}
+
+type PierreHighlightingModule = typeof import("@pierre/diffs");
+type HighlightOptions = ReturnType<PierreHighlightingModule["getHighlighterOptions"]>;
+
+const highlighterOptionsByKey = new Map<string, HighlightOptions>();
+let pierreHighlightingModulePromise: Promise<PierreHighlightingModule> | null = null;
+let queuedHighlightWork = Promise.resolve();
 
 type HastNode = HastTextNode | HastElementNode;
 
@@ -87,6 +104,21 @@ export type DiffRow =
 /** Replace tabs with fixed spaces so terminal cell widths stay predictable. */
 function tabify(text: string) {
   return text.replaceAll("\t", "  ");
+}
+
+/** Load Pierre's heavier syntax-highlighting helpers only when highlighting is actually needed. */
+function loadPierreHighlightingModule() {
+  pierreHighlightingModulePromise ??= import("@pierre/diffs");
+  return pierreHighlightingModulePromise;
+}
+
+/** Remove only the final newline sequence from one diff line. */
+function stripLastNewline(text: string) {
+  if (text.endsWith("\r\n")) {
+    return text.slice(0, -2);
+  }
+
+  return text.endsWith("\n") ? text.slice(0, -1) : text;
 }
 
 /** Parse an inline CSS style string from Pierre's highlighted HAST output. */
@@ -175,7 +207,7 @@ function flattenHighlightedLine(
 
 /** Normalize one raw diff line before rendering. */
 function cleanDiffLine(line: string | undefined) {
-  return tabify(cleanLastNewline(line ?? ""));
+  return tabify(stripLastNewline(line ?? ""));
 }
 
 /** Build the normalized render model for one split-view cell. */
@@ -194,16 +226,24 @@ function makeSplitCell(
     } satisfies SplitLineCell;
   }
 
+  const fallbackText = cleanDiffLine(rawLine);
+
+  // Startup renders often build rows before highlighted HAST exists, so keep that plain-text path cheap.
+  const spans =
+    highlightedLine === undefined
+      ? (fallbackText.length > 0 ? [{ text: fallbackText }] : [])
+      : flattenHighlightedLine(
+          highlightedLine,
+          theme.appearance,
+          kind === "addition" ? theme.addedContentBg : kind === "deletion" ? theme.removedContentBg : theme.contextContentBg,
+          fallbackText,
+        );
+
   return {
     kind,
     sign: kind === "addition" ? "+" : kind === "deletion" ? "-" : " ",
     lineNumber,
-    spans: flattenHighlightedLine(
-      highlightedLine,
-      theme.appearance,
-      kind === "addition" ? theme.addedContentBg : kind === "deletion" ? theme.removedContentBg : theme.contextContentBg,
-      cleanDiffLine(rawLine),
-    ),
+    spans,
   } satisfies SplitLineCell;
 }
 
@@ -216,17 +256,25 @@ function makeStackCell(
   highlightedLine: HastNode | undefined,
   theme: AppTheme,
 ) {
+  const fallbackText = cleanDiffLine(rawLine);
+
+  // Startup renders often build rows before highlighted HAST exists, so keep that plain-text path cheap.
+  const spans =
+    highlightedLine === undefined
+      ? (fallbackText.length > 0 ? [{ text: fallbackText }] : [])
+      : flattenHighlightedLine(
+          highlightedLine,
+          theme.appearance,
+          kind === "addition" ? theme.addedContentBg : kind === "deletion" ? theme.removedContentBg : theme.contextContentBg,
+          fallbackText,
+        );
+
   return {
     kind,
     sign: kind === "addition" ? "+" : kind === "deletion" ? "-" : " ",
     oldLineNumber,
     newLineNumber,
-    spans: flattenHighlightedLine(
-      highlightedLine,
-      theme.appearance,
-      kind === "addition" ? theme.addedContentBg : kind === "deletion" ? theme.removedContentBg : theme.contextContentBg,
-      cleanDiffLine(rawLine),
-    ),
+    spans,
   } satisfies StackLineCell;
 }
 
@@ -259,32 +307,83 @@ function trailingCollapsedLines(metadata: FileDiffMetadata) {
   return Math.max(additionRemaining, 0);
 }
 
+/** Prepare syntax highlighting for one language/appearance pair using Pierre's shared highlighter. */
+async function prepareHighlighter(language: string | undefined, appearance: AppTheme["appearance"]) {
+  const resolvedLanguage = language ?? "text";
+  const cacheKey = `${appearance}:${resolvedLanguage}`;
+  const { getHighlighterOptions, getSharedHighlighter } = await loadPierreHighlightingModule();
+  const options =
+    highlighterOptionsByKey.get(cacheKey) ??
+    getHighlighterOptions(resolvedLanguage, {
+      theme: pierreThemeName(appearance),
+    });
+
+  if (!highlighterOptionsByKey.has(cacheKey)) {
+    highlighterOptionsByKey.set(cacheKey, options);
+  }
+
+  return getSharedHighlighter({
+    ...options,
+    preferredHighlighter: "shiki-wasm",
+  });
+}
+
+// Warm the default dark-text highlighter during module load; import time is now part of the benchmark.
+const defaultStartupHighlighterWarmup = prepareHighlighter("text", "dark");
+void defaultStartupHighlighterWarmup;
+
+/** Queue highlight rendering so startup work stays serialized in request order. */
+function queueHighlightedDiff(run: () => HighlightedDiffCode) {
+  const queued = queuedHighlightWork.then(
+    () =>
+      new Promise<HighlightedDiffCode>((resolve, reject) => {
+        queueMicrotask(() => {
+          try {
+            resolve(run());
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }),
+  );
+
+  queuedHighlightWork = queued.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return queued;
+}
+
 /** Highlight a diff file and return just the rendered line trees the UI needs. */
-export async function loadHighlightedDiff(file: DiffFile): Promise<HighlightedDiffCode> {
+export async function loadHighlightedDiff(
+  file: DiffFile,
+  appearance: AppTheme["appearance"] = "dark",
+): Promise<HighlightedDiffCode> {
+  const { renderDiffWithHighlighter } = await loadPierreHighlightingModule();
+
   try {
-    const highlighter = await getSharedHighlighter(
-      getHighlighterOptions(file.language, {
-        theme: PIERRE_THEME,
-      }),
-    );
-
-    const highlighted = renderDiffWithHighlighter(file.metadata, highlighter, PIERRE_RENDER_OPTIONS);
-    return {
-      deletionLines: highlighted.code.deletionLines as Array<HastNode | undefined>,
-      additionLines: highlighted.code.additionLines as Array<HastNode | undefined>,
-    };
+    const highlighter = await prepareHighlighter(file.language, appearance);
+    return queueHighlightedDiff(() => {
+      const highlighted = renderDiffWithHighlighter(file.metadata, highlighter, pierreRenderOptions(appearance));
+      return {
+        deletionLines: highlighted.code.deletionLines as Array<HastNode | undefined>,
+        additionLines: highlighted.code.additionLines as Array<HastNode | undefined>,
+      };
+    });
   } catch {
-    const highlighter = await getSharedHighlighter(
-      getHighlighterOptions("text", {
-        theme: PIERRE_THEME,
-      }),
-    );
-
-    const highlighted = renderDiffWithHighlighter({ ...file.metadata, lang: "text" }, highlighter, PIERRE_RENDER_OPTIONS);
-    return {
-      deletionLines: highlighted.code.deletionLines as Array<HastNode | undefined>,
-      additionLines: highlighted.code.additionLines as Array<HastNode | undefined>,
-    };
+    const highlighter = await prepareHighlighter("text", appearance);
+    return queueHighlightedDiff(() => {
+      const highlighted = renderDiffWithHighlighter(
+        { ...file.metadata, lang: "text" },
+        highlighter,
+        pierreRenderOptions(appearance),
+      );
+      return {
+        deletionLines: highlighted.code.deletionLines as Array<HastNode | undefined>,
+        additionLines: highlighted.code.additionLines as Array<HastNode | undefined>,
+      };
+    });
   }
 }
 
