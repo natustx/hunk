@@ -14,7 +14,8 @@
     "build:bin": "bash ./scripts/build-bin.sh",
     "install:bin": "bash ./scripts/install-bin.sh",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "bench:bootstrap-load": "bun run test/bootstrap-load-benchmark.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
