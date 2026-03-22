@@ -107,25 +107,6 @@ function createHunkMcpServer(state: HunkDaemonState) {
   );
 
   server.registerTool(
-    "list_files",
-    {
-      title: "List files in one live Hunk session",
-      description: "List the diff files in one live Hunk session and mark the currently selected file.",
-      inputSchema: sessionSelectorSchema as any,
-    } as any,
-    (async (input: { sessionId?: string; repoRoot?: string }) => {
-      const files = state.listFiles({ sessionId: input.sessionId, repoRoot: input.repoRoot });
-
-      return {
-        content: textContent(formatToolJson({ files })),
-        structuredContent: {
-          files,
-        },
-      };
-    }) as any,
-  );
-
-  server.registerTool(
     "get_selected_context",
     {
       title: "Get the selected file and hunk",
@@ -139,33 +120,6 @@ function createHunkMcpServer(state: HunkDaemonState) {
         content: textContent(formatToolJson(context)),
         structuredContent: {
           context,
-        },
-      };
-    }) as any,
-  );
-
-  server.registerTool(
-    "navigate_to_file",
-    {
-      title: "Focus one diff file",
-      description: "Move the live Hunk session to one diff file and optional hunk index.",
-      inputSchema: sessionSelectorSchema.extend({
-        filePath: z.string().describe("Diff file path as shown by Hunk."),
-        hunkIndex: z.number().int().nonnegative().optional().describe("Optional 0-based hunk index within the file."),
-      }) as any,
-    } as any,
-    (async (input: {
-      sessionId?: string;
-      repoRoot?: string;
-      filePath: string;
-      hunkIndex?: number;
-    }) => {
-      const result = await state.sendNavigateToFile(input);
-
-      return {
-        content: textContent(formatToolJson(result)),
-        structuredContent: {
-          result,
         },
       };
     }) as any,

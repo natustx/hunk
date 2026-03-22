@@ -81,7 +81,7 @@ describe("Hunk MCP daemon state", () => {
     expect(() => resolveSessionTarget(two, { repoRoot: "/repo" })).toThrow("specify sessionId instead");
   });
 
-  test("lists files and exposes the selected session context from snapshot state", () => {
+  test("exposes the selected session context from snapshot state", () => {
     const state = new HunkDaemonState();
     const socket = {
       send() {},
@@ -96,13 +96,6 @@ describe("Hunk MCP daemon state", () => {
         selectedHunkNewRange: [8, 8],
       }),
     );
-
-    expect(state.listFiles({ sessionId: "session-1" })).toEqual([
-      expect.objectContaining({
-        path: "src/example.ts",
-        selected: true,
-      }),
-    ]);
 
     expect(state.getSelectedContext({ sessionId: "session-1" })).toEqual(
       expect.objectContaining({

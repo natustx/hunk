@@ -5,8 +5,6 @@ import type {
   HunkSessionRegistration,
   HunkSessionSnapshot,
   ListedSession,
-  ListedSessionFile,
-  NavigateToFileToolInput,
   NavigateToHunkToolInput,
   NavigatedSelectionResult,
   SelectedSessionContext,
@@ -118,17 +116,6 @@ export class HunkDaemonState {
 
   getSession(selector: SessionTargetSelector) {
     return resolveSessionTarget(this.listSessions(), selector);
-  }
-
-  listFiles(selector: SessionTargetSelector): ListedSessionFile[] {
-    const session = this.getSession(selector);
-
-    return session.files.map((file) => ({
-      ...file,
-      selected: file.id === session.snapshot.selectedFileId
-        || file.path === session.snapshot.selectedFilePath
-        || file.previousPath === session.snapshot.selectedFilePath,
-    }));
   }
 
   getSelectedContext(selector: SessionTargetSelector): SelectedSessionContext {
@@ -244,15 +231,6 @@ export class HunkDaemonState {
       "comment",
       input,
       "Timed out waiting for the Hunk session to apply the comment.",
-    );
-  }
-
-  sendNavigateToFile(input: NavigateToFileToolInput) {
-    return this.sendCommand<NavigatedSelectionResult, "navigate_to_file">(
-      { sessionId: input.sessionId, repoRoot: input.repoRoot },
-      "navigate_to_file",
-      input,
-      "Timed out waiting for the Hunk session to navigate to the requested file.",
     );
   }
 

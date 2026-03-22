@@ -265,7 +265,7 @@ describe("MCP end-to-end", () => {
     }
   }, 20_000);
 
-  test("expanded MCP tools can inspect files and navigate the selected hunk in a live session", async () => {
+  test("expanded MCP tools can inspect the selected context and navigate hunks in a live session", async () => {
     if (!ttyToolsAvailable) {
       return;
     }
@@ -318,12 +318,6 @@ describe("MCP end-to-end", () => {
       });
       const targetSession = listed.find((session) => session.files.some((file) => file.path === fixture.afterName)) ?? listed[0]!;
 
-      const files = await listFiles(client, targetSession.sessionId);
-      expect(files).toHaveLength(1);
-      expect(files[0]?.path).toBe(fixture.afterName);
-      expect(files[0]?.hunkCount).toBe(2);
-      expect(files[0]?.selected).toBe(true);
-
       const initialContext = await getSelectedContext(client, targetSession.sessionId);
       expect(initialContext?.selectedFile?.path).toBe(fixture.afterName);
       expect(initialContext?.selectedHunk?.index).toBe(0);
@@ -347,7 +341,7 @@ describe("MCP end-to-end", () => {
       expect(updatedContext.selectedHunk?.oldRange).toBeDefined();
 
       await client.callTool({
-        name: "navigate_to_file",
+        name: "navigate_to_hunk",
         arguments: {
           sessionId: targetSession.sessionId,
           filePath: fixture.afterName,
@@ -355,7 +349,7 @@ describe("MCP end-to-end", () => {
         },
       });
 
-      const resetContext = await waitUntil("selected file reset", async () => {
+      const resetContext = await waitUntil("selected hunk reset", async () => {
         const context = await getSelectedContext(client, targetSession.sessionId);
         return context?.selectedHunk?.index === 0 ? context : null;
       });

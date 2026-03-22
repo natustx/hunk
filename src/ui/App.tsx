@@ -285,30 +285,6 @@ export function App({
         };
   }, []);
 
-  /** Move the live session selection to one file and optional hunk target. */
-  const navigateToFileSelection = useCallback(
-    async (message: Extract<SessionServerMessage, { command: "navigate_to_file" }>) => {
-      const file = findDiffFileByPath(allFiles, message.input.filePath);
-      if (!file) {
-        throw new Error(`No visible diff file matches ${message.input.filePath}.`);
-      }
-
-      const hunkIndex = message.input.hunkIndex ?? 0;
-      if (hunkIndex < 0 || hunkIndex >= Math.max(file.metadata.hunks.length, 1)) {
-        throw new Error(`File ${message.input.filePath} does not have hunk index ${hunkIndex}.`);
-      }
-
-      jumpToFile(file.id, hunkIndex);
-      return {
-        fileId: file.id,
-        filePath: file.path,
-        hunkIndex,
-        selectedHunk: buildSelectedHunkSummary(file, hunkIndex),
-      };
-    },
-    [allFiles, buildSelectedHunkSummary],
-  );
-
   /** Move the live session selection to one specific hunk by index or line lookup. */
   const navigateToHunkSelection = useCallback(
     async (message: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>) => {
@@ -388,14 +364,13 @@ export function App({
 
     hostClient.setBridge({
       applyComment: applyIncomingComment,
-      navigateToFile: navigateToFileSelection,
       navigateToHunk: navigateToHunkSelection,
     });
 
     return () => {
       hostClient.setBridge(null);
     };
-  }, [applyIncomingComment, hostClient, navigateToFileSelection, navigateToHunkSelection]);
+  }, [applyIncomingComment, hostClient, navigateToHunkSelection]);
 
   useEffect(() => {
     const selectedRange = currentHunk ? hunkLineRange(currentHunk) : undefined;

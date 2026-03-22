@@ -17,7 +17,6 @@ const HEARTBEAT_INTERVAL_MS = 10_000;
 
 export interface HunkAppBridge {
   applyComment: (message: Extract<SessionServerMessage, { command: "comment" }>) => Promise<AppliedCommentResult>;
-  navigateToFile: (message: Extract<SessionServerMessage, { command: "navigate_to_file" }>) => Promise<NavigatedSelectionResult>;
   navigateToHunk: (message: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>) => Promise<NavigatedSelectionResult>;
 }
 
@@ -255,8 +254,6 @@ export class HunkHostClient {
     switch (message.command) {
       case "comment":
         return this.bridge.applyComment(message);
-      case "navigate_to_file":
-        return this.bridge.navigateToFile(message);
       case "navigate_to_hunk":
         return this.bridge.navigateToHunk(message);
     }

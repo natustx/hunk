@@ -146,12 +146,6 @@ export type SessionServerMessage =
   | {
       type: "command";
       requestId: string;
-      command: "navigate_to_file";
-      input: NavigateToFileToolInput;
-    }
-  | {
-      type: "command";
-      requestId: string;
       command: "navigate_to_hunk";
       input: NavigateToHunkToolInput;
     };
