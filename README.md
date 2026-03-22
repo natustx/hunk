@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hunk-logo.png" alt="Hunk logo" width="180">
+</p>
+
 # hunk
 
 <p align="center">
