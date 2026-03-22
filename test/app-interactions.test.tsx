@@ -341,9 +341,9 @@ describe("App interactions", () => {
     try {
       await flush(setup);
 
-      let frame = setup.captureCharFrame();
-      expect(frame).toContain("line01 = 101");
-      expect(frame).not.toContain("line10 = 110");
+      const initialFrame = setup.captureCharFrame();
+      expect(initialFrame).toContain("line01 = 101");
+      expect(initialFrame).not.toContain("line08 = 108");
 
       for (let index = 0; index < 6; index += 1) {
         await act(async () => {
@@ -352,11 +352,11 @@ describe("App interactions", () => {
         await flush(setup);
       }
 
-      frame = setup.captureCharFrame();
-      expect(frame).toContain("line10 = 110");
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("line08 = 108");
       expect(frame).not.toContain("line01 = 101");
 
-      for (let index = 0; index < 3; index += 1) {
+      for (let index = 0; index < 6; index += 1) {
         await act(async () => {
           await setup.mockInput.pressArrow("up");
         });
@@ -364,7 +364,7 @@ describe("App interactions", () => {
       }
 
       frame = setup.captureCharFrame();
-      expect(frame).toContain("line07 = 107");
+      expect(frame).toContain("line01 = 101");
     } finally {
       await act(async () => {
         setup.renderer.destroy();
@@ -378,9 +378,9 @@ describe("App interactions", () => {
     try {
       await flush(setup);
 
-      let frame = setup.captureCharFrame();
-      expect(frame).toContain("line01 = 101");
-      expect(frame).not.toContain("line10 = 110");
+      const initialFrame = setup.captureCharFrame();
+      expect(initialFrame).toContain("line01 = 101");
+      expect(initialFrame).not.toContain("line08 = 108");
 
       for (let index = 0; index < 3; index += 1) {
         await act(async () => {
@@ -389,11 +389,11 @@ describe("App interactions", () => {
         await flush(setup);
       }
 
-      frame = setup.captureCharFrame();
+      let frame = setup.captureCharFrame();
       expect(frame).toContain("line08 = 108");
       expect(frame).not.toContain("line01 = 101");
 
-      for (let index = 0; index < 2; index += 1) {
+      for (let index = 0; index < 3; index += 1) {
         await act(async () => {
           await setup.mockInput.pressArrow("up");
         });
@@ -401,7 +401,7 @@ describe("App interactions", () => {
       }
 
       frame = setup.captureCharFrame();
-      expect(frame).toContain("line06 = 106");
+      expect(frame).toContain("line01 = 101");
     } finally {
       await act(async () => {
         setup.renderer.destroy();

@@ -864,7 +864,6 @@ export function App({
           <>
             <FilesPane
               entries={fileEntries}
-              focused={focusArea === "files"}
               scrollRef={filesScrollRef}
               selectedFileId={selectedFile?.id}
               textWidth={filesTextWidth}
