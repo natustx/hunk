@@ -8,12 +8,11 @@
 
 Hunk is a desktop-inspired terminal diff viewer for reviewing agent-authored changesets.
 
-## What Hunk is good at
-
-- Review a whole changeset in one full-screen, multi-file stream.
-- Switch between split, stack, and auto layouts without leaving the diff.
-- Open working tree diffs, staged changes, commits, patches, or file pairs from one CLI.
-- Show optional agent notes beside the hunks they explain.
+- full-screen multi-file review stream
+- split, stacked, and responsive auto layouts
+- keyboard and mouse navigation
+- optional agent rationale beside annotated hunks
+- Git pager and difftool integration
 
 ## Install
 
@@ -24,22 +23,16 @@ npm i -g hunkdiff
 Requirements:
 
 - Node.js 18+
-- Git for `hunk diff`, `hunk show`, `hunk stash show`, pager integration, and difftool workflows
+- Git is recommended for most workflows
 
 ## First run
 
-In any Git repo:
-
 ```bash
-hunk diff
+hunk           # show help
+hunk --version # show the installed version
+hunk diff      # review current repo changes
+hunk show      # review the latest commit
 ```
-
-Useful first keys:
-
-- `↑` / `↓` line scroll
-- `[` / `]` next and previous hunk
-- `1` split, `2` stack, `0` auto layout
-- `q` or `Esc` quit
 
 ## Next things to try
 
@@ -48,7 +41,6 @@ hunk diff --staged
 hunk show HEAD~1
 hunk diff before.ts after.ts
 git diff --no-color | hunk patch -
-hunk --version
 ```
 
 ## Feature comparison
