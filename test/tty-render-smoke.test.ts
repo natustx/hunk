@@ -152,8 +152,8 @@ async function runStdinPagerSmoke(options?: { input?: string; inputCommand?: str
   const transcript = join(fixture.dir, "stdin-pager-transcript.txt");
   const subcommand = options?.command === "pager" ? "pager" : "patch -";
   const patchCommand = `cat ${shellQuote(fixture.coloredPatch)} | bun run ${shellQuote(sourceEntrypoint)} ${subcommand}`;
-  const scriptCommand = `timeout 5 script -q -f -e -c ${shellQuote(patchCommand)} ${shellQuote(transcript)}`;
-  const inputCommand = options?.inputCommand ?? `(sleep 1; printf ${shellQuote(options?.input ?? "q")})`;
+  const scriptCommand = `timeout 7 script -q -f -e -c ${shellQuote(patchCommand)} ${shellQuote(transcript)}`;
+  const inputCommand = options?.inputCommand ?? `(sleep 2; printf ${shellQuote(options?.input ?? "q")})`;
   const proc = Bun.spawnSync(["bash", "-lc", `${inputCommand} | ${scriptCommand}`], {
     cwd: fixture.dir,
     stdin: "ignore",
