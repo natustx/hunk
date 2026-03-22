@@ -62,10 +62,10 @@ index 6b7b7a1..624ed80 100644
 +    ...grouped.needsHelp.map(formatTask),
 +  ].join("\n");
  }
-diff --git a/test/main.test.ts b/test/main.test.ts
+diff --git a/test/main.demo.ts b/test/main.demo.ts
 index b63bffa..d9d98d8 100644
---- a/test/main.test.ts
-+++ b/test/main.test.ts
+--- a/test/main.demo.ts
++++ b/test/main.demo.ts
 @@ -1,9 +1,11 @@
  import { expect, test } from "bun:test";
  import { renderMorningSummary } from "../src/main";

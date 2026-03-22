@@ -13,4 +13,4 @@ hunk patch examples/2-mini-app-refactor/change.patch
 - a multi-file review stream in sidebar order
 - a new helper module added mid-change
 - the entrypoint switching from flat output to grouped sections
-- a matching test update at the end of the review
+- a matching validation-file update at the end of the review

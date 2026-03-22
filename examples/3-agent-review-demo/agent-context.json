@@ -36,7 +36,7 @@
       ]
     },
     {
-      "path": "test/search.test.ts",
+      "path": "test/search.demo.ts",
       "summary": "Locks in normalized query handling and result ordering.",
       "annotations": [
         {
