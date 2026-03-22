@@ -32,6 +32,8 @@ The review-oriented MCP tools are:
 
 Call `list_sessions` first.
 
+If no session exists but the user wants interactive review, launch Hunk (`hunk diff`, `hunk show`, or the source entrypoint in this repo), then come back and call `list_sessions` again.
+
 Use `sessionId` explicitly whenever more than one live session exists.
 
 ### 2. Inspect current focus

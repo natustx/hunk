@@ -54,7 +54,9 @@ For concrete MCP tool behavior and examples, read [references/mcp-review.md](ref
 
 ## Start Hunk only when needed
 
-If no live Hunk session exists and the user wants an interactive review UI, launch one with a minimal command.
+If no live Hunk session exists and the user wants an interactive review UI, launch Hunk itself with a minimal command and let it auto-start/register with the MCP daemon.
+
+After launching Hunk, go back to `list_sessions` rather than suggesting manual daemon management.
 
 Inside the Hunk repo, prefer the source entrypoint:
 
