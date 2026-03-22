@@ -243,7 +243,7 @@ describe("TTY render smoke", () => {
 
     const output = await runStdinPagerSmoke({
       lines: 40,
-      inputCommand: `(sleep 1; printf ' '; sleep 1; printf q)`,
+      inputCommand: `(sleep 2; printf ' '; sleep 2; printf q)`,
     });
 
     expect(output).toContain("before_23");
