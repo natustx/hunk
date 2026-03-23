@@ -139,7 +139,9 @@ Use the Hunk review skill: [`skills/hunk-review/SKILL.md`](skills/hunk-review/SK
 
 A good generic prompt is:
 
-- "Load the Hunk skill and use it for this review."
+```text
+> Load the Hunk skill and use it for this review
+```
 
 That skill teaches the agent how to inspect a live Hunk session, navigate it, reload it, and leave inline comments.
 
