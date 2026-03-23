@@ -10,7 +10,7 @@ import {
   DEFAULT_FILE_COUNT,
   DEFAULT_LINES_PER_FILE,
   DEFAULT_NOTES_PER_FILE,
-} from "./large-split-stream-fixture";
+} from "./large-stream-fixture";
 
 const VIEWPORT = {
   width: 240,
