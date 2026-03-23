@@ -31,7 +31,10 @@ describe("MCP daemon launcher", () => {
     // inside the binary, while argv[0] is the actual compiled binary path.
     expect(
       resolveDaemonLaunchCommand(
-        ["/usr/local/lib/node_modules/hunkdiff/node_modules/hunkdiff-darwin-arm64/bin/hunk", "show"],
+        [
+          "/usr/local/lib/node_modules/hunkdiff/node_modules/hunkdiff-darwin-arm64/bin/hunk",
+          "show",
+        ],
         "/usr/local/lib/node_modules/hunkdiff/node_modules/hunkdiff-darwin-arm64/bin/hunk___bun",
       ),
     ).toEqual({
