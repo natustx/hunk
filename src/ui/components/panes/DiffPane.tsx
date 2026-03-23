@@ -187,7 +187,9 @@ export function DiffPane({
     return next;
   }, [adjacentPrefetchFileIds, selectedFileId, visibleViewportFileIds, windowingEnabled]);
 
-  const selectedFileIndex = selectedFileId ? files.findIndex((file) => file.id === selectedFileId) : -1;
+  const selectedFileIndex = selectedFileId
+    ? files.findIndex((file) => file.id === selectedFileId)
+    : -1;
   const selectedFile = selectedFileIndex >= 0 ? files[selectedFileIndex] : undefined;
   const selectedAnchorId = selectedFile
     ? selectedFile.metadata.hunks[selectedHunkIndex]
@@ -211,7 +213,10 @@ export function DiffPane({
     top += 1;
 
     if (selectedFile.metadata.hunks.length > 0) {
-      const clampedHunkIndex = Math.max(0, Math.min(selectedHunkIndex, selectedFile.metadata.hunks.length - 1));
+      const clampedHunkIndex = Math.max(
+        0,
+        Math.min(selectedHunkIndex, selectedFile.metadata.hunks.length - 1),
+      );
       top += sectionMetrics[selectedFileIndex]?.hunkAnchorRows.get(clampedHunkIndex) ?? 0;
     }
 
@@ -305,7 +310,9 @@ export function DiffPane({
                     adjacentPrefetchFileIds.has(file.id) ||
                     shouldPrefetchVisibleHighlight
                   }
-                  onHighlightReady={file.id === selectedFileId ? handleSelectedHighlightReady : undefined}
+                  onHighlightReady={
+                    file.id === selectedFileId ? handleSelectedHighlightReady : undefined
+                  }
                   separatorWidth={separatorWidth}
                   showSeparator={index > 0}
                   showLineNumbers={showLineNumbers}
@@ -313,7 +320,9 @@ export function DiffPane({
                   wrapLines={wrapLines}
                   theme={theme}
                   viewWidth={diffContentWidth}
-                  visibleAgentNotes={visibleAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES}
+                  visibleAgentNotes={
+                    visibleAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES
+                  }
                   onOpenAgentNotesAtHunk={(hunkIndex) => onOpenAgentNotesAtHunk(file.id, hunkIndex)}
                   onSelect={() => onSelectFile(file.id)}
                 />

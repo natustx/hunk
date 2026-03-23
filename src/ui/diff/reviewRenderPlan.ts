@@ -90,13 +90,13 @@ function rowOverlapsAnnotation(row: DiffLineRow, annotation: AgentAnnotation) {
 
   return Boolean(
     annotation.newRange &&
-      (row.type === "split-line"
-        ? row.right.lineNumber !== undefined &&
-          row.right.lineNumber >= annotation.newRange[0] &&
-          row.right.lineNumber <= annotation.newRange[1]
-        : row.cell.newLineNumber !== undefined &&
-          row.cell.newLineNumber >= annotation.newRange[0] &&
-          row.cell.newLineNumber <= annotation.newRange[1]),
+    (row.type === "split-line"
+      ? row.right.lineNumber !== undefined &&
+        row.right.lineNumber >= annotation.newRange[0] &&
+        row.right.lineNumber <= annotation.newRange[1]
+      : row.cell.newLineNumber !== undefined &&
+        row.cell.newLineNumber >= annotation.newRange[0] &&
+        row.cell.newLineNumber <= annotation.newRange[1]),
   );
 }
 
@@ -109,7 +109,9 @@ function findInlineNoteAnchorRow(rows: DiffRow[], annotation: AgentAnnotation) {
   const fileLineRows = lineRows(rows);
   const headerRow = rows.find((row) => row.type === "hunk-header");
 
-  return fileLineRows.find((row) => rowMatchesNote(row, annotation)) ?? fileLineRows[0] ?? headerRow;
+  return (
+    fileLineRows.find((row) => rowMatchesNote(row, annotation)) ?? fileLineRows[0] ?? headerRow
+  );
 }
 
 function buildInlineVisibleNotePlacements(rows: DiffRow[], visibleAgentNotes: VisibleAgentNote[]) {
@@ -125,14 +127,16 @@ function buildInlineVisibleNotePlacements(rows: DiffRow[], visibleAgentNotes: Vi
     const anchorSide = annotationAnchor(note.annotation)?.side;
     const coveredRows = fileLineRows.filter((row) => rowOverlapsAnnotation(row, note.annotation));
     const fallbackGuideRow = anchorSide ? anchorRow : undefined;
-    const guideRows = coveredRows.length > 0 ? coveredRows : fallbackGuideRow ? [fallbackGuideRow] : [];
+    const guideRows =
+      coveredRows.length > 0 ? coveredRows : fallbackGuideRow ? [fallbackGuideRow] : [];
     const anchorPlacements = placementsByAnchor.get(anchorRow.key) ?? [];
 
     anchorPlacements.push({
       anchorKey: anchorRow.key,
       anchorSide,
       endGuideAfterKey: guideRows.at(-1)?.key,
-      guidedRowKeys: guideRows.length > 0 ? new Set(guideRows.map((row) => row.key)) : EMPTY_ROW_KEYS,
+      guidedRowKeys:
+        guideRows.length > 0 ? new Set(guideRows.map((row) => row.key)) : EMPTY_ROW_KEYS,
       hunkIndex: anchorRow.hunkIndex,
       note,
       noteCount: 1,
@@ -222,7 +226,8 @@ export function buildReviewRenderPlan({
   const anchoredHunks = new Set<number>();
 
   for (const row of rows) {
-    const shouldAnchorHunk = rowCanAnchorHunk(row, showHunkHeaders) && !anchoredHunks.has(row.hunkIndex);
+    const shouldAnchorHunk =
+      rowCanAnchorHunk(row, showHunkHeaders) && !anchoredHunks.has(row.hunkIndex);
     const anchorId = shouldAnchorHunk ? diffHunkId(fileId, row.hunkIndex) : undefined;
 
     if (shouldAnchorHunk) {

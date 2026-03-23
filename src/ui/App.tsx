@@ -173,9 +173,15 @@ function AppShell({
       (responsiveLayout.showFilesPane || (forceSidebarOpen && canForceShowFilesPane));
   const centerWidth = bodyWidth;
   const resolvedLayout = responsiveLayout.layout;
-  const availableCenterWidth = showFilesPane ? Math.max(0, centerWidth - DIVIDER_WIDTH) : Math.max(0, centerWidth);
-  const maxFilesPaneWidth = showFilesPane ? Math.max(FILES_MIN_WIDTH, availableCenterWidth - DIFF_MIN_WIDTH) : FILES_MIN_WIDTH;
-  const clampedFilesPaneWidth = showFilesPane ? clamp(filesPaneWidth, FILES_MIN_WIDTH, maxFilesPaneWidth) : 0;
+  const availableCenterWidth = showFilesPane
+    ? Math.max(0, centerWidth - DIVIDER_WIDTH)
+    : Math.max(0, centerWidth);
+  const maxFilesPaneWidth = showFilesPane
+    ? Math.max(FILES_MIN_WIDTH, availableCenterWidth - DIFF_MIN_WIDTH)
+    : FILES_MIN_WIDTH;
+  const clampedFilesPaneWidth = showFilesPane
+    ? clamp(filesPaneWidth, FILES_MIN_WIDTH, maxFilesPaneWidth)
+    : 0;
   const diffPaneWidth = showFilesPane
     ? Math.max(DIFF_MIN_WIDTH, availableCenterWidth - clampedFilesPaneWidth)
     : Math.max(0, availableCenterWidth);
