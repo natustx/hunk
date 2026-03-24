@@ -107,6 +107,7 @@ function AppShell({
   const terminal = useTerminalDimensions();
   const filesScrollRef = useRef<ScrollBoxRenderable | null>(null);
   const diffScrollRef = useRef<ScrollBoxRenderable | null>(null);
+  const wrapToggleScrollTopRef = useRef<number | null>(null);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(bootstrap.initialMode);
   const [themeId, setThemeId] = useState(
     () => resolveTheme(bootstrap.initialTheme, renderer.themeMode).id,
@@ -232,9 +233,10 @@ function AppShell({
   }, [maxFilesPaneWidth, showFilesPane]);
 
   useEffect(() => {
-    // Force an intermediate redraw when the shell geometry changes so pane relayout feels immediate.
+    // Force an intermediate redraw when shell geometry or row-wrapping changes so pane relayout
+    // feels immediate after toggling split/stack or line wrapping.
     renderer.intermediateRender();
-  }, [renderer, resolvedLayout, showFilesPane, terminal.height, terminal.width]);
+  }, [renderer, resolvedLayout, showFilesPane, terminal.height, terminal.width, wrapLines]);
 
   useEffect(() => {
     if (!selectedFile && filteredFiles[0]) {
@@ -335,6 +337,7 @@ function AppShell({
 
   /** Toggle whether diff code rows wrap instead of truncating to one terminal row. */
   const toggleLineWrap = () => {
+    wrapToggleScrollTopRef.current = diffScrollRef.current?.scrollTop ?? 0;
     setWrapLines((current) => !current);
   };
 
@@ -662,6 +665,11 @@ function AppShell({
         return;
       }
 
+      if (key.name === "w" || key.sequence === "w") {
+        toggleLineWrap();
+        return;
+      }
+
       return;
     }
 
@@ -949,6 +957,7 @@ function AppShell({
           showLineNumbers={showLineNumbers}
           showHunkHeaders={showHunkHeaders}
           wrapLines={wrapLines}
+          wrapToggleScrollTop={wrapToggleScrollTopRef.current}
           theme={activeTheme}
           width={diffPaneWidth}
           onOpenAgentNotesAtHunk={openAgentNotesAtHunk}

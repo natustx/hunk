@@ -130,13 +130,14 @@ function createSingleFileBootstrap(): AppBootstrap {
   };
 }
 
-function createWrapBootstrap(): AppBootstrap {
+function createWrapBootstrap(pager = false): AppBootstrap {
   return {
     input: {
       kind: "git",
       staged: false,
       options: {
         mode: "split",
+        pager,
       },
     },
     changeset: {
@@ -190,12 +191,48 @@ function createLineScrollBootstrap(pager = false): AppBootstrap {
   };
 }
 
+function createWrapScrollBootstrap(): AppBootstrap {
+  const before =
+    Array.from(
+      { length: 18 },
+      (_, index) => `export const line${String(index + 1).padStart(2, "0")} = ${index + 1};`,
+    ).join("\n") + "\n";
+  const after =
+    Array.from(
+      { length: 18 },
+      (_, index) =>
+        `export const line${String(index + 1).padStart(2, "0")} = ${index + 101}; // this is intentionally long wrap coverage for viewport anchoring`,
+    ).join("\n") + "\n";
+
+  return {
+    input: {
+      kind: "git",
+      staged: false,
+      options: {
+        mode: "split",
+      },
+    },
+    changeset: {
+      id: "changeset:app-wrap-scroll",
+      sourceLabel: "repo",
+      title: "repo working tree",
+      files: [createDiffFile("wrap-scroll", "wrap-scroll.ts", before, after, true)],
+    },
+    initialMode: "split",
+    initialTheme: "midnight",
+  };
+}
+
 async function flush(setup: Awaited<ReturnType<typeof testRender>>) {
   await act(async () => {
     await setup.renderOnce();
     await Bun.sleep(0);
     await setup.renderOnce();
   });
+}
+
+function firstVisibleAddedLine(frame: string) {
+  return frame.match(/line\d{2} = 1\d{2}/)?.[0] ?? null;
 }
 
 describe("App interactions", () => {
@@ -270,6 +307,76 @@ describe("App interactions", () => {
       expect(frame).toContain("this is a very");
       expect(frame).toContain("long wrapped line");
       expect(frame).toContain("coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("pager mode keyboard shortcut can wrap long lines", async () => {
+    const setup = await testRender(<App bootstrap={createWrapBootstrap(true)} />, {
+      width: 140,
+      height: 20,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).not.toContain("interaction coverage");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+
+      frame = setup.captureCharFrame();
+      expect(frame).toContain("this is a very");
+      expect(frame).toContain("long wrapped line");
+      expect(frame).toContain("coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("keyboard shortcut can toggle line wrapping on, off, and on again", async () => {
+    const setup = await testRender(<App bootstrap={createWrapBootstrap()} />, {
+      width: 102,
+      height: 24,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).not.toContain("interaction coverage");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+
+      frame = setup.captureCharFrame();
+      expect(frame).toContain("interaction coverage");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+
+      frame = setup.captureCharFrame();
+      expect(frame).not.toContain("interaction coverage");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+
+      frame = setup.captureCharFrame();
+      expect(frame).toContain("interaction coverage");
     } finally {
       await act(async () => {
         setup.renderer.destroy();
@@ -617,6 +724,67 @@ describe("App interactions", () => {
     }
   });
 
+  test("toggling wrap preserves the current viewport anchor instead of snapping to the top", async () => {
+    const setup = await testRender(<App bootstrap={createWrapScrollBootstrap()} />, {
+      width: 102,
+      height: 12,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("line01 = 101");
+      expect(frame).not.toContain("line08 = 108");
+
+      for (let index = 0; index < 24; index += 1) {
+        await act(async () => {
+          await setup.mockInput.pressArrow("down");
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("line08 = 108") && !frame.includes("line01 = 101")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("line08 = 108");
+      expect(frame).not.toContain("line01 = 101");
+      const anchoredLine = firstVisibleAddedLine(frame);
+      expect(anchoredLine).not.toBeNull();
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+      await act(async () => {
+        await Bun.sleep(80);
+        await setup.renderOnce();
+      });
+
+      frame = setup.captureCharFrame();
+      expect(frame).toContain(anchoredLine!);
+      expect(firstVisibleAddedLine(frame)).toBe(anchoredLine);
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await flush(setup);
+      await act(async () => {
+        await Bun.sleep(80);
+        await setup.renderOnce();
+      });
+
+      frame = setup.captureCharFrame();
+      expect(frame).toContain(anchoredLine!);
+      expect(firstVisibleAddedLine(frame)).toBe(anchoredLine);
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
   test("Space scrolls down by viewport", async () => {
     // Create a file with many lines so Space has room to scroll
     const before =
@@ -655,15 +823,13 @@ describe("App interactions", () => {
 
     try {
       await flush(setup);
-      setup.captureCharFrame(); // Capture initial state
+      setup.captureCharFrame();
 
-      // Press Space to scroll down - should not crash and should change view
       await act(async () => {
         await setup.mockInput.pressKey(" ");
       });
       await flush(setup);
 
-      // App should still be rendering without errors
       const frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
     } finally {
@@ -711,20 +877,17 @@ describe("App interactions", () => {
     try {
       await flush(setup);
 
-      // First scroll down to have room to scroll back up
       await act(async () => {
         await setup.mockInput.pressKey(" ");
       });
       await flush(setup);
-      setup.captureCharFrame(); // Capture after Space
+      setup.captureCharFrame();
 
-      // Now scroll back up with PageUp - should not crash
       await act(async () => {
         await setup.mockInput.pressKey("pageup");
       });
       await flush(setup);
 
-      // App should still be rendering
       const frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
     } finally {
@@ -773,7 +936,6 @@ describe("App interactions", () => {
       await flush(setup);
       const initialFrame = setup.captureCharFrame();
 
-      // Press 'd' (half page down) - should not crash
       await act(async () => {
         await setup.mockInput.pressKey("d");
       });
@@ -781,7 +943,6 @@ describe("App interactions", () => {
       let frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
 
-      // Press 'u' (half page up) - should not crash
       await act(async () => {
         await setup.mockInput.pressKey("u");
       });
@@ -789,14 +950,12 @@ describe("App interactions", () => {
       frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
 
-      // Press 'f' (page down, less-style) - should not crash
       await act(async () => {
         await setup.mockInput.pressKey("f");
       });
       await flush(setup);
       frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
-      // Content should have changed after scrolling
       expect(frame).not.toEqual(initialFrame);
     } finally {
       await act(async () => {
