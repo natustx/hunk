@@ -10,6 +10,10 @@ Use this skill when the task involves Hunk itself or when the user wants an inte
 
 Start by explaining Hunk plainly: **Hunk is a review-first terminal diff viewer for agent-authored changesets.**
 
+**Important distinction:** Hunk is an interactive terminal UI meant for the user to view and navigate. As a coding agent, you should NOT invoke `hunk diff` or `hunk show` directly - these launch an interactive TUI that you cannot use. Instead, get agent-friendly information via `hunk session *` commands to inspect and manipulate existing live sessions.
+
+If no live session exists yet, suggest the user launch Hunk in their terminal first, then use session commands to interact with it.
+
 ## Mental model
 
 Keep these product rules in mind:
@@ -80,28 +84,24 @@ When passing comment text through a shell, quote `--summary` and `--rationale` d
 
 ## Common commands
 
-If operating inside the Hunk source repo, prefer the source entrypoint:
+**For coding agents:** Use these `hunk session` commands to inspect and manipulate live sessions without invoking the interactive UI:
 
 ```bash
-bun run src/main.tsx -- diff
-bun run src/main.tsx -- show HEAD~1
-```
-
-Otherwise use the installed CLI:
-
-```bash
-hunk diff
-hunk show
-```
-
-Useful live-session commands:
-
-```bash
-hunk session list
-hunk session context --repo .
+hunk session list                           # see all live sessions
+hunk session context --repo .               # get current focus and state
 hunk session navigate --repo . --file README.md --hunk 2
-hunk session reload --repo . -- show HEAD~1 -- README.md
+hunk session reload --repo . -- diff        # refresh with working tree
+hunk session reload --repo . -- show HEAD~1 # refresh with specific commit
 hunk session comment add --repo . --file README.md --new-line 103 --summary "Tighten this wording"
+hunk session comment list --repo . --file README.md
+```
+
+**For users:** Launch Hunk interactively in a terminal (not via agent):
+
+```bash
+hunk diff                                   # review working tree
+hunk show HEAD~1                            # review a commit
+bun run src/main.tsx -- diff                # from source (if in hunk repo)
 ```
 
 Use `hunk diff --agent-context path/to/context.json` when a local rationale sidecar already exists.
@@ -155,9 +155,9 @@ Keep comments concise and spatially tied to the code they describe.
 
 ## When no live session exists
 
-If the user wants interactive review and no live session exists, launch Hunk with a minimal review command, then go back to `hunk session list`.
+If the user wants interactive review and no live session exists, **suggest the user launch Hunk in their terminal** with a command like `hunk diff` or `hunk show`, then return to `hunk session list` once they confirm it's running.
 
-Prefer a real terminal or tmux pane over redirected stdout captures.
+Do not attempt to launch Hunk yourself - you cannot interact with the TUI. Only the user can navigate the interactive interface.
 
 ## Repo-specific notes
 
