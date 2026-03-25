@@ -130,6 +130,7 @@ function createSingleFileBootstrap(): AppBootstrap {
   };
 }
 
+/** Build a single-file fixture with one long changed line for wrap toggle interaction tests. */
 function createWrapBootstrap(pager = false): AppBootstrap {
   return {
     input: {
@@ -191,6 +192,7 @@ function createLineScrollBootstrap(pager = false): AppBootstrap {
   };
 }
 
+/** Build a long-line fixture that is tall enough to verify viewport-anchor restoration. */
 function createWrapScrollBootstrap(): AppBootstrap {
   const before =
     Array.from(
@@ -231,6 +233,7 @@ async function flush(setup: Awaited<ReturnType<typeof testRender>>) {
   });
 }
 
+/** Let wrap-toggle renders and follow-up layout retries settle before asserting on the frame. */
 async function settleWrapToggle(setup: Awaited<ReturnType<typeof testRender>>) {
   await flush(setup);
   await act(async () => {
@@ -239,6 +242,7 @@ async function settleWrapToggle(setup: Awaited<ReturnType<typeof testRender>>) {
   });
 }
 
+/** Poll rendered frames until a predicate matches, which keeps interaction tests resilient to async repaints. */
 async function waitForFrame(
   setup: Awaited<ReturnType<typeof testRender>>,
   predicate: (frame: string) => boolean,
@@ -390,6 +394,8 @@ describe("App interactions", () => {
       await settleWrapToggle(setup);
 
       frame = await waitForFrame(setup, (nextFrame) => nextFrame.includes("coverage';"));
+      // Assert on a suffix fragment that only appears once the long line has actually wrapped;
+      // this is more stable than expecting the full sentence to remain on one terminal row.
       expect(frame).toContain("wrapped line");
       expect(frame).toContain("coverage';");
 

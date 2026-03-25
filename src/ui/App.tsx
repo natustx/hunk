@@ -337,6 +337,8 @@ function AppShell({
 
   /** Toggle whether diff code rows wrap instead of truncating to one terminal row. */
   const toggleLineWrap = () => {
+    // Capture the pre-toggle viewport position synchronously so DiffPane can restore the same
+    // top-most source row after wrapped row heights change.
     wrapToggleScrollTopRef.current = diffScrollRef.current?.scrollTop ?? 0;
     setWrapLines((current) => !current);
   };
