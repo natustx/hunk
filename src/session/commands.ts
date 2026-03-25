@@ -26,6 +26,8 @@ import type {
   RemovedCommentResult,
   SelectedSessionContext,
   SessionLiveCommentSummary,
+  SessionTerminalLocation,
+  SessionTerminalMetadata,
 } from "../mcp/types";
 import {
   HUNK_SESSION_API_PATH,
@@ -359,27 +361,88 @@ function formatSelectedSummary(session: ListedSession) {
   return filePath === "(none)" ? filePath : `${filePath} hunk ${hunkNumber}`;
 }
 
+function formatTerminalLocation(location: SessionTerminalLocation) {
+  const parts: string[] = [];
+
+  if (location.tty) {
+    parts.push(location.tty);
+  }
+
+  if (location.windowId) {
+    parts.push(`window ${location.windowId}`);
+  }
+
+  if (location.tabId) {
+    parts.push(`tab ${location.tabId}`);
+  }
+
+  if (location.paneId) {
+    parts.push(`pane ${location.paneId}`);
+  }
+
+  if (location.terminalId) {
+    parts.push(`terminal ${location.terminalId}`);
+  }
+
+  if (location.sessionId) {
+    parts.push(`session ${location.sessionId}`);
+  }
+
+  return parts.length > 0 ? parts.join(", ") : "present";
+}
+
+function resolveSessionTerminal(session: ListedSession) {
+  return session.terminal;
+}
+
+function formatTerminalLines(
+  terminal: SessionTerminalMetadata | undefined,
+  {
+    headerLabel,
+    locationLabel,
+  }: {
+    headerLabel: string;
+    locationLabel: string;
+  },
+) {
+  if (!terminal) {
+    return [];
+  }
+
+  return [
+    ...(terminal.program ? [`${headerLabel}: ${terminal.program}`] : []),
+    ...terminal.locations.map(
+      (location) => `${locationLabel}[${location.source}]: ${formatTerminalLocation(location)}`,
+    ),
+  ];
+}
+
 function formatListOutput(sessions: ListedSession[]) {
   if (sessions.length === 0) {
     return "No active Hunk sessions.\n";
   }
 
   return `${sessions
-    .map((session) =>
-      [
+    .map((session) => {
+      const terminal = resolveSessionTerminal(session);
+      return [
         `${session.sessionId}  ${session.title}`,
         `  repo: ${session.repoRoot ?? session.cwd}`,
-        ...(session.tty ? [`  tty: ${session.tty}`] : []),
-        ...(session.tmuxPane ? [`  tmux pane: ${session.tmuxPane}`] : []),
+        ...formatTerminalLines(terminal, {
+          headerLabel: "  terminal",
+          locationLabel: "  location",
+        }),
         `  focus: ${formatSelectedSummary(session)}`,
         `  files: ${session.fileCount}`,
         `  comments: ${session.snapshot.liveCommentCount}`,
-      ].join("\n"),
-    )
+      ].join("\n");
+    })
     .join("\n\n")}\n`;
 }
 
 function formatSessionOutput(session: ListedSession) {
+  const terminal = resolveSessionTerminal(session);
+
   return [
     `Session: ${session.sessionId}`,
     `Title: ${session.title}`,
@@ -387,8 +450,10 @@ function formatSessionOutput(session: ListedSession) {
     `Repo: ${session.repoRoot ?? session.cwd}`,
     `Input: ${session.inputKind}`,
     `Launched: ${session.launchedAt}`,
-    ...(session.tty ? [`TTY: ${session.tty}`] : []),
-    ...(session.tmuxPane ? [`Tmux pane: ${session.tmuxPane}`] : []),
+    ...formatTerminalLines(terminal, {
+      headerLabel: "Terminal",
+      locationLabel: "Location",
+    }),
     `Selected: ${formatSelectedSummary(session)}`,
     `Agent notes visible: ${session.snapshot.showAgentNotes ? "yes" : "no"}`,
     `Live comments: ${session.snapshot.liveCommentCount}`,

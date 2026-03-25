@@ -293,12 +293,18 @@ describe("session command compatibility checks", () => {
   });
 });
 
-describe("session list includes tty and tmux metadata", () => {
-  test("list output includes tty and tmux pane when present", async () => {
+describe("session list includes terminal metadata", () => {
+  test("list output includes generic terminal and location lines when present", async () => {
     const session = {
       ...createListedSession("session-1"),
-      tty: "/dev/ttys003",
-      tmuxPane: "%2",
+      terminal: {
+        program: "iTerm.app",
+        locations: [
+          { source: "tty", tty: "/dev/ttys003" },
+          { source: "tmux", paneId: "%2" },
+          { source: "iterm2", windowId: "1", tabId: "2", paneId: "3" },
+        ],
+      },
     };
 
     setSessionCommandTestHooks({
@@ -315,11 +321,13 @@ describe("session list includes tty and tmux metadata", () => {
       output: "text",
     } satisfies SessionCommandInput);
 
-    expect(output).toContain("tty: /dev/ttys003");
-    expect(output).toContain("tmux pane: %2");
+    expect(output).toContain("terminal: iTerm.app");
+    expect(output).toContain("location[tty]: /dev/ttys003");
+    expect(output).toContain("location[tmux]: pane %2");
+    expect(output).toContain("location[iterm2]: window 1, tab 2, pane 3");
   });
 
-  test("list output omits tty and tmux lines when absent", async () => {
+  test("list output omits terminal lines when absent", async () => {
     setSessionCommandTestHooks({
       createClient: () =>
         createClient({
@@ -334,15 +342,20 @@ describe("session list includes tty and tmux metadata", () => {
       output: "text",
     } satisfies SessionCommandInput);
 
-    expect(output).not.toContain("tty:");
-    expect(output).not.toContain("tmux pane:");
+    expect(output).not.toContain("terminal:");
+    expect(output).not.toContain("location[");
   });
 
-  test("get output includes tty and tmux pane when present", async () => {
+  test("get output includes generic terminal location lines when present", async () => {
     const session = {
       ...createListedSession("session-1"),
-      tty: "/dev/ttys005",
-      tmuxPane: "%0",
+      terminal: {
+        program: "ghostty",
+        locations: [
+          { source: "tty", tty: "/dev/ttys005" },
+          { source: "tmux", paneId: "%0" },
+        ],
+      },
     };
 
     setSessionCommandTestHooks({
@@ -360,15 +373,21 @@ describe("session list includes tty and tmux metadata", () => {
       output: "text",
     } satisfies SessionCommandInput);
 
-    expect(output).toContain("TTY: /dev/ttys005");
-    expect(output).toContain("Tmux pane: %0");
+    expect(output).toContain("Terminal: ghostty");
+    expect(output).toContain("Location[tty]: /dev/ttys005");
+    expect(output).toContain("Location[tmux]: pane %0");
   });
 
-  test("json output includes tty and tmux pane fields", async () => {
+  test("json output includes terminal metadata fields", async () => {
     const session = {
       ...createListedSession("session-1"),
-      tty: "/dev/ttys003",
-      tmuxPane: "%2",
+      terminal: {
+        program: "iTerm.app",
+        locations: [
+          { source: "tty", tty: "/dev/ttys003" },
+          { source: "tmux", paneId: "%2" },
+        ],
+      },
     };
 
     setSessionCommandTestHooks({
@@ -386,7 +405,14 @@ describe("session list includes tty and tmux metadata", () => {
     } satisfies SessionCommandInput);
 
     const parsed = JSON.parse(output);
-    expect(parsed.sessions[0].tty).toBe("/dev/ttys003");
-    expect(parsed.sessions[0].tmuxPane).toBe("%2");
+    expect(parsed.sessions[0].terminal).toEqual({
+      program: "iTerm.app",
+      locations: [
+        { source: "tty", tty: "/dev/ttys003" },
+        { source: "tmux", paneId: "%2" },
+      ],
+    });
+    expect(parsed.sessions[0]).not.toHaveProperty("tty");
+    expect(parsed.sessions[0]).not.toHaveProperty("tmuxPane");
   });
 });

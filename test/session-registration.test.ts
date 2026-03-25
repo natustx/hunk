@@ -35,23 +35,34 @@ function createMockSocket() {
   return { send: () => {} };
 }
 
-describe("session registration tty metadata", () => {
-  test("daemon state passes tty and tmuxPane through to listed sessions", () => {
+describe("session registration terminal metadata", () => {
+  test("daemon state passes generic terminal metadata through to listed sessions", () => {
     const state = new HunkDaemonState();
     const registration = createRegistration({
-      tty: "/dev/ttys003",
-      tmuxPane: "%2",
+      terminal: {
+        program: "iTerm.app",
+        locations: [
+          { source: "tty", tty: "/dev/ttys003" },
+          { source: "tmux", paneId: "%2" },
+          {
+            source: "iterm2",
+            windowId: "1",
+            tabId: "2",
+            paneId: "3",
+            sessionId: "w1t2p3:ABC",
+          },
+        ],
+      },
     });
 
     state.registerSession(createMockSocket(), registration, createSnapshot());
 
     const sessions = state.listSessions();
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.tty).toBe("/dev/ttys003");
-    expect(sessions[0]!.tmuxPane).toBe("%2");
+    expect(sessions[0]!.terminal).toEqual(registration.terminal);
   });
 
-  test("daemon state omits tty and tmuxPane when not set", () => {
+  test("daemon state omits terminal metadata when nothing is known", () => {
     const state = new HunkDaemonState();
     const registration = createRegistration();
 
@@ -59,7 +70,6 @@ describe("session registration tty metadata", () => {
 
     const sessions = state.listSessions();
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.tty).toBeUndefined();
-    expect(sessions[0]!.tmuxPane).toBeUndefined();
+    expect(sessions[0]!.terminal).toBeUndefined();
   });
 });
