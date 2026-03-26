@@ -36,7 +36,7 @@ import { useHunkSessionBridge } from "./hooks/useHunkSessionBridge";
 import { useMenuController } from "./hooks/useMenuController";
 import { buildAppMenus } from "./lib/appMenus";
 import { buildSidebarEntries } from "./lib/files";
-import { buildHunkCursors, findNextHunkCursor } from "./lib/hunks";
+import { buildAnnotatedHunkCursors, buildHunkCursors, findNextHunkCursor } from "./lib/hunks";
 import { fileRowId } from "./lib/ids";
 import { resolveResponsiveLayout } from "./lib/responsive";
 import { resizeSidebarWidth } from "./lib/sidebar";
@@ -193,6 +193,7 @@ function AppShell({
     allFiles.find((file) => file.id === selectedFileId) ??
     filteredFiles[0];
   const hunkCursors = buildHunkCursors(filteredFiles);
+  const annotatedHunkCursors = buildAnnotatedHunkCursors(filteredFiles);
 
   const bodyPadding = pagerMode ? 0 : BODY_PADDING;
   const bodyWidth = Math.max(0, terminal.width - bodyPadding);
@@ -277,6 +278,23 @@ function AppShell({
   /** Move the review focus across hunks in stream order. */
   const moveHunk = (delta: number) => {
     const nextCursor = findNextHunkCursor(hunkCursors, selectedFile?.id, selectedHunkIndex, delta);
+    if (!nextCursor) {
+      return;
+    }
+
+    filesScrollRef.current?.scrollChildIntoView(fileRowId(nextCursor.fileId));
+    setSelectedFileId(nextCursor.fileId);
+    setSelectedHunkIndex(nextCursor.hunkIndex);
+  };
+
+  /** Move the review focus to the next or previous annotated hunk. */
+  const moveAnnotatedHunk = (delta: number) => {
+    const nextCursor = findNextHunkCursor(
+      annotatedHunkCursors,
+      selectedFile?.id,
+      selectedHunkIndex,
+      delta,
+    );
     if (!nextCursor) {
       return;
     }
@@ -478,6 +496,7 @@ function AppShell({
         focusFilter: () => setFocusArea("filter"),
         layoutMode,
         moveAnnotatedFile,
+        moveAnnotatedHunk,
         moveHunk,
         refreshCurrentInput: triggerRefreshCurrentInput,
         requestQuit,
@@ -502,6 +521,7 @@ function AppShell({
       canRefreshCurrentInput,
       layoutMode,
       moveAnnotatedFile,
+      moveAnnotatedHunk,
       moveHunk,
       requestQuit,
       triggerRefreshCurrentInput,
@@ -874,6 +894,18 @@ function AppShell({
 
     if (key.name === "]") {
       moveHunk(1);
+      closeMenu();
+      return;
+    }
+
+    if (key.sequence === "{") {
+      moveAnnotatedHunk(-1);
+      closeMenu();
+      return;
+    }
+
+    if (key.sequence === "}") {
+      moveAnnotatedHunk(1);
       closeMenu();
       return;
     }

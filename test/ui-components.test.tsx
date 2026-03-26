@@ -841,13 +841,13 @@ describe("UI components", () => {
     const frame = await captureFrame(
       <HelpDialog
         canRefresh={true}
-        terminalHeight={28}
+        terminalHeight={29}
         terminalWidth={76}
         theme={theme}
         onClose={() => {}}
       />,
       76,
-      28,
+      29,
     );
 
     const expectedRows = [
@@ -860,6 +860,7 @@ describe("UI components", () => {
       "Shift+Space     page up (alt)",
       "d / u           half page down / up",
       "[ / ]           previous / next hunk",
+      "{ / }           previous / next comment",
       "Home / End      jump to top / bottom",
       "View",
       "1 / 2 / 0       split / stack / auto",
