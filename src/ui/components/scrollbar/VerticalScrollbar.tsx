@@ -96,7 +96,8 @@ export const VerticalScrollbar = forwardRef<VerticalScrollbarHandle, VerticalScr
       }
 
       const deltaY = event.y - dragStartYRef.current;
-      const pixelsPerRow = maxThumbY / maxScroll;
+      // Guard against division by zero when thumb fills track (maxThumbY = 0) or no scroll needed
+      const pixelsPerRow = maxThumbY > 0 && maxScroll > 0 ? maxThumbY / maxScroll : 1;
       const scrollDelta = deltaY / pixelsPerRow;
       const newScrollTop = Math.max(
         0,
@@ -113,6 +114,8 @@ export const VerticalScrollbar = forwardRef<VerticalScrollbarHandle, VerticalScr
       if (event.button !== 0) return;
 
       // Calculate where on the track was clicked
+      // Note: event.y is relative to the scrollbar container since the component
+      // is positioned at top: 0. If scrollbar position changes, this needs adjustment.
       const clickY = event.y;
 
       // If clicked above thumb, scroll up one viewport
