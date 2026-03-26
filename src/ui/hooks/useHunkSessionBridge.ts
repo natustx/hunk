@@ -57,12 +57,33 @@ export function useHunkSessionBridge({
         };
   }, []);
 
+  /** Merge live comments into the raw file list so annotation queries see both sources. */
+  const filesWithLiveComments = useCallback(() => {
+    const current = liveCommentsByFileIdRef.current;
+    return files.map((file) => {
+      const comments = current[file.id];
+      if (!comments || comments.length === 0) {
+        return file;
+      }
+
+      return {
+        ...file,
+        agent: {
+          path: file.path,
+          summary: file.agent?.summary,
+          annotations: [...(file.agent?.annotations ?? []), ...comments],
+        },
+      };
+    });
+  }, [files]);
+
   const navigateToHunkSelection = useCallback(
     async (message: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>) => {
       /** Handle relative comment navigation (--next-comment / --prev-comment). */
       if (message.input.commentDirection) {
         const delta = message.input.commentDirection === "next" ? 1 : -1;
-        const annotatedCursors = buildAnnotatedHunkCursors(files);
+        const merged = filesWithLiveComments();
+        const annotatedCursors = buildAnnotatedHunkCursors(merged);
         const nextCursor = findNextHunkCursor(
           annotatedCursors,
           selectedFile?.id,
@@ -74,7 +95,7 @@ export function useHunkSessionBridge({
           throw new Error("No annotated hunks found in the current review.");
         }
 
-        const targetFile = files.find((f) => f.id === nextCursor.fileId);
+        const targetFile = merged.find((f) => f.id === nextCursor.fileId);
         if (!targetFile) {
           throw new Error("Resolved annotated hunk references an unknown file.");
         }
@@ -121,7 +142,14 @@ export function useHunkSessionBridge({
         selectedHunk: buildSelectedHunkSummary(file, hunkIndex),
       };
     },
-    [buildSelectedHunkSummary, files, jumpToFile, selectedFile?.id, selectedHunkIndex],
+    [
+      buildSelectedHunkSummary,
+      files,
+      filesWithLiveComments,
+      jumpToFile,
+      selectedFile?.id,
+      selectedHunkIndex,
+    ],
   );
 
   const applyIncomingComment = useCallback(
