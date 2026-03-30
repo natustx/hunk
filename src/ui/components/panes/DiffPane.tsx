@@ -8,6 +8,7 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { UI_SCROLL_CONSTANTS } from "../../../core/constants";
 import type { DiffFile, LayoutMode } from "../../../core/types";
 import type { VisibleAgentNote } from "../../lib/agentAnnotations";
 import { computeHunkRevealScrollTop } from "../../lib/hunkScroll";
@@ -285,7 +286,7 @@ export function DiffPane({
   );
 
   const visibleViewportFileIds = useMemo(() => {
-    const overscanRows = 8;
+    const overscanRows = UI_SCROLL_CONSTANTS.VIEWPORT_OVERSCAN_ROWS;
     const minVisibleY = Math.max(0, scrollViewport.top - overscanRows);
     const maxVisibleY = scrollViewport.top + scrollViewport.height + overscanRows;
     let offsetY = 0;
@@ -507,7 +508,7 @@ export function DiffPane({
         suppressNextSelectionAutoScrollRef.current = true;
         // Retry across a couple of repaint cycles so the restored top-row anchor sticks
         // after wrapped row heights and viewport culling settle.
-        const retryDelays = [0, 16, 48];
+        const retryDelays = UI_SCROLL_CONSTANTS.SCROLL_RESTORE_RETRY_DELAYS_MS;
         const timeouts = retryDelays.map((delay) => setTimeout(restoreViewportAnchor, delay));
 
         previousWrapLinesRef.current = wrapLines;
@@ -552,7 +553,10 @@ export function DiffPane({
       }
 
       const viewportHeight = Math.max(scrollViewport.height, scrollBox.viewport.height ?? 0);
-      const preferredTopPadding = Math.max(2, Math.floor(viewportHeight * 0.25));
+      const preferredTopPadding = Math.max(
+        UI_SCROLL_CONSTANTS.DIFF_SELECTION_MIN_TOP_PADDING,
+        Math.floor(viewportHeight * 0.25),
+      );
 
       // When navigating comment-to-comment, scroll the inline note card near the viewport top
       // instead of positioning the entire hunk. Uses the same reveal function so the padding
@@ -608,7 +612,7 @@ export function DiffPane({
     // Run after this pane renders the selected section/hunk, then retry briefly while layout
     // settles across a couple of repaint cycles.
     scrollSelectionIntoView();
-    const retryDelays = [0, 16, 48];
+    const retryDelays = UI_SCROLL_CONSTANTS.SCROLL_RESTORE_RETRY_DELAYS_MS;
     const timeouts = retryDelays.map((delay) => setTimeout(scrollSelectionIntoView, delay));
     return () => {
       timeouts.forEach((timeout) => clearTimeout(timeout));

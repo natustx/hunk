@@ -7,6 +7,7 @@ import {
 } from "@pierre/diffs";
 import { createTwoFilesPatch } from "diff";
 import { resolve as resolvePath } from "node:path";
+import { DIFF_CONTEXT_LINES } from "./constants";
 import { findAgentFileContext, loadAgentContext } from "./agent";
 import {
   buildGitDiffArgs,
@@ -356,9 +357,9 @@ async function loadFileDiffChangeset(
     cacheKey: `${rightPath}:right`,
   };
 
-  const metadata = parseDiffFromFile(oldFile, newFile, { context: 3 }, true);
+  const metadata = parseDiffFromFile(oldFile, newFile, { context: DIFF_CONTEXT_LINES }, true);
   const patch = createTwoFilesPatch(displayPath, displayPath, leftText, rightText, "", "", {
-    context: 3,
+    context: DIFF_CONTEXT_LINES,
   });
 
   return {

@@ -6,6 +6,12 @@ import {
   type FileDiffMetadata,
   type Hunk,
 } from "@pierre/diffs";
+import {
+  DEFAULT_TAB_SIZE,
+  HIGHLIGHTER_PREFERRED,
+  THEME_CONSTANTS,
+  TOKENIZE_MAX_LINE_LENGTH,
+} from "../../core/constants";
 import type { DiffFile } from "../../core/types";
 import type { AppTheme } from "../themes";
 
@@ -22,12 +28,12 @@ function pierreThemeName(appearance: AppTheme["appearance"]) {
 const PIERRE_RENDER_OPTIONS_BY_APPEARANCE = {
   light: {
     theme: pierreThemeName("light"),
-    tokenizeMaxLineLength: 1_000,
+    tokenizeMaxLineLength: TOKENIZE_MAX_LINE_LENGTH,
     lineDiffType: "word-alt" as const,
   },
   dark: {
     theme: pierreThemeName("dark"),
-    tokenizeMaxLineLength: 1_000,
+    tokenizeMaxLineLength: TOKENIZE_MAX_LINE_LENGTH,
     lineDiffType: "word-alt" as const,
   },
 } as const;
@@ -38,6 +44,7 @@ function pierreRenderOptions(appearance: AppTheme["appearance"]) {
 }
 
 type HighlightOptions = ReturnType<typeof getHighlighterOptions>;
+type Highlighter = Awaited<ReturnType<typeof getSharedHighlighter>>;
 
 const highlighterOptionsByKey = new Map<string, HighlightOptions>();
 let queuedHighlightWork = Promise.resolve();
@@ -108,7 +115,7 @@ export type DiffRow =
 
 /** Replace tabs with fixed spaces so terminal cell widths stay predictable. */
 function tabify(text: string) {
-  return text.replaceAll("\t", "  ");
+  return text.replaceAll("\t", " ".repeat(DEFAULT_TAB_SIZE));
 }
 
 /** Parse an inline CSS style string from Pierre's highlighted HAST output. */
@@ -134,19 +141,10 @@ function parseStyleValue(styleValue: unknown) {
   return styles;
 }
 
-const RESERVED_PIERRE_TOKEN_COLORS = {
-  dark: {
-    "#ff6762": "keyword",
-    "#5ecc71": "string",
-  },
-  light: {
-    "#d52c36": "keyword",
-    "#199f43": "string",
-  },
-} as const;
+const RESERVED_PIERRE_TOKEN_COLORS = THEME_CONSTANTS.RESERVED_PIERRE_TOKEN_COLORS;
 
 /** Remap Pierre token hues that collide with diff add/remove semantics into theme-safe syntax colors. */
-function normalizeHighlightedColor(color: string | undefined, theme: AppTheme) {
+function normalizeHighlightedColor(color: string | undefined, theme: AppTheme): string | undefined {
   if (!color) {
     return color;
   }
@@ -184,7 +182,7 @@ function flattenHighlightedLine(
   theme: AppTheme,
   emphasisBg: string,
   fallbackText: string,
-) {
+): RenderSpan[] {
   const spans: RenderSpan[] = [];
   const colorVariable = theme.appearance === "light" ? "--diffs-token-light" : "--diffs-token-dark";
 
@@ -240,7 +238,7 @@ function makeSplitCell(
   rawLine: string | undefined,
   highlightedLine: HastNode | undefined,
   theme: AppTheme,
-) {
+): SplitLineCell {
   if (kind === "empty") {
     return {
       kind,
@@ -284,7 +282,7 @@ function makeStackCell(
   rawLine: string | undefined,
   highlightedLine: HastNode | undefined,
   theme: AppTheme,
-) {
+): StackLineCell {
   const fallbackText = cleanDiffLine(rawLine);
 
   // Startup renders often build rows before highlighted HAST exists, so keep that plain-text path cheap.
@@ -349,7 +347,7 @@ function trailingCollapsedLines(metadata: FileDiffMetadata) {
 async function prepareHighlighter(
   language: string | undefined,
   appearance: AppTheme["appearance"],
-) {
+): Promise<Highlighter> {
   const resolvedLanguage = language ?? "text";
   const cacheKey = `${appearance}:${resolvedLanguage}`;
   const options =
@@ -364,12 +362,12 @@ async function prepareHighlighter(
 
   return getSharedHighlighter({
     ...options,
-    preferredHighlighter: "shiki-wasm",
+    preferredHighlighter: HIGHLIGHTER_PREFERRED,
   });
 }
 
 /** Queue highlight rendering so startup work stays serialized in request order. */
-function queueHighlightedDiff(run: () => HighlightedDiffCode) {
+function queueHighlightedDiff(run: () => HighlightedDiffCode): Promise<HighlightedDiffCode> {
   const queued = queuedHighlightWork.then(
     () =>
       new Promise<HighlightedDiffCode>((resolve, reject) => {

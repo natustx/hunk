@@ -8,9 +8,10 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { UI_SCROLL_CONSTANTS } from "../../../core/constants";
 import type { AppTheme } from "../../themes";
 
-const HIDE_DELAY_MS = 2000;
+const HIDE_DELAY_MS = UI_SCROLL_CONSTANTS.SCROLLBAR_HIDE_DELAY_MS;
 const SCROLLBAR_WIDTH = 1;
 const MIN_THUMB_HEIGHT = 2;
 

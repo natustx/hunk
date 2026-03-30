@@ -16,6 +16,7 @@ import {
   useState,
   useRef,
 } from "react";
+import { UI_LAYOUT_CONSTANTS, WATCH_POLL_INTERVAL_MS } from "../core/constants";
 import { resolveConfiguredCliInput } from "../core/config";
 import { loadAppBootstrap } from "../core/loaders";
 import { resolveRuntimeCliInput } from "../core/terminal";
@@ -101,11 +102,14 @@ function AppShell({
     options?: { resetShell?: boolean; sourcePath?: string },
   ) => Promise<ReloadedSessionResult>;
 }) {
-  const FILES_MIN_WIDTH = 22;
-  const DIFF_MIN_WIDTH = 48;
-  const BODY_PADDING = 2;
-  const DIVIDER_WIDTH = 1;
-  const DIVIDER_HIT_WIDTH = 5;
+  const {
+    BODY_PADDING,
+    DIFF_MIN_WIDTH,
+    DIVIDER_HIT_WIDTH,
+    DIVIDER_WIDTH,
+    FILES_MIN_WIDTH,
+    SIDEBAR_DEFAULT_WIDTH,
+  } = UI_LAYOUT_CONSTANTS;
 
   const renderer = useRenderer();
   const terminal = useTerminalDimensions();
@@ -125,7 +129,7 @@ function AppShell({
   const [showHelp, setShowHelp] = useState(false);
   const [focusArea, setFocusArea] = useState<FocusArea>("files");
   const [filter, setFilter] = useState("");
-  const [filesPaneWidth, setFilesPaneWidth] = useState(34);
+  const [filesPaneWidth, setFilesPaneWidth] = useState<number>(SIDEBAR_DEFAULT_WIDTH);
   const [resizeDragOriginX, setResizeDragOriginX] = useState<number | null>(null);
   const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
   const [selectedFileId, setSelectedFileId] = useState(bootstrap.changeset.files[0]?.id ?? "");
@@ -463,7 +467,7 @@ function AppShell({
       }
     };
 
-    const interval = setInterval(pollForChanges, 250);
+    const interval = setInterval(pollForChanges, WATCH_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
