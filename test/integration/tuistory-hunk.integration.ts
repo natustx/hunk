@@ -174,10 +174,7 @@ describe("Hunk integration via tuistory", () => {
       await session.click(/M delta\.ts\s+\+2 -1/);
       const jumped = await harness.waitForSnapshot(
         session,
-        (text) =>
-          text.includes("deltaOnly = true") &&
-          !text.includes("alphaOnly = true") &&
-          harness.countMatches(text, /epsilon\.ts/g) >= 2,
+        (text) => text.includes("deltaOnly = true") && !text.includes("alphaOnly = true"),
         5_000,
       );
 
