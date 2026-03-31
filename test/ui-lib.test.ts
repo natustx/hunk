@@ -177,8 +177,10 @@ describe("ui helpers", () => {
   test("keyboard alias helpers normalize the shared scroll shortcut keys", () => {
     expect(isPageDownKey(createKeyEvent({ name: "pagedown" }))).toBe(true);
     expect(isPageDownKey(createKeyEvent({ name: "space" }))).toBe(true);
+    expect(isPageDownKey(createKeyEvent({ name: "f" }))).toBe(true);
     expect(isPageDownKey(createKeyEvent({ sequence: "f" }))).toBe(true);
     expect(isPageUpKey(createKeyEvent({ name: "pageup" }))).toBe(true);
+    expect(isPageUpKey(createKeyEvent({ name: "b" }))).toBe(true);
     expect(isPageUpKey(createKeyEvent({ sequence: "b" }))).toBe(true);
     expect(isShiftSpacePageUpKey(createKeyEvent({ name: "space", shift: true }))).toBe(true);
     expect(isHalfPageDownKey(createKeyEvent({ name: "d" }))).toBe(true);
@@ -187,6 +189,7 @@ describe("ui helpers", () => {
     expect(isStepDownKey(createKeyEvent({ sequence: "j" }))).toBe(true);
     expect(isStepUpKey(createKeyEvent({ name: "up" }))).toBe(true);
     expect(isStepUpKey(createKeyEvent({ sequence: "k" }))).toBe(true);
+    expect(isPageDownKey(createKeyEvent({ name: "space", shift: true }))).toBe(false);
     expect(isPageDownKey(createKeyEvent({ name: "q" }))).toBe(false);
     expect(isShiftSpacePageUpKey(createKeyEvent({ name: "space", shift: false }))).toBe(false);
   });

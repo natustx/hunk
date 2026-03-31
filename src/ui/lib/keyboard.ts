@@ -6,7 +6,12 @@ function isSpaceKey(key: KeyEvent) {
 
 /** Match any key alias that should scroll forward by a full viewport. */
 export function isPageDownKey(key: KeyEvent) {
-  return key.name === "pagedown" || isSpaceKey(key) || key.name === "f" || key.sequence === "f";
+  return (
+    key.name === "pagedown" ||
+    (!key.shift && isSpaceKey(key)) ||
+    key.name === "f" ||
+    key.sequence === "f"
+  );
 }
 
 /** Match any key alias that should scroll backward by a full viewport. */

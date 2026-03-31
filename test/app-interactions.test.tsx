@@ -1069,7 +1069,7 @@ describe("App interactions", () => {
     }
   });
 
-  test("new shortcuts d, u, and f work without errors", async () => {
+  test("new shortcuts d, u, f, and Shift+Space work without errors", async () => {
     const before =
       Array.from(
         { length: 50 },
@@ -1102,6 +1102,7 @@ describe("App interactions", () => {
     const setup = await testRender(<AppHost bootstrap={bootstrap} />, {
       width: 220,
       height: 12,
+      otherModifiersMode: true,
     });
 
     try {
@@ -1139,6 +1140,13 @@ describe("App interactions", () => {
       expect(frame).toContain("export const line");
       expect(firstVisibleAddedLine(frame)).not.toBeNull();
       expect(firstVisibleAddedLine(frame)).not.toBe(initialTopLine);
+
+      await act(async () => {
+        await setup.mockInput.pressKey(" ", { shift: true });
+      });
+      await flush(setup);
+      frame = setup.captureCharFrame();
+      expect(frame).toContain("export const line");
     } finally {
       await act(async () => {
         setup.renderer.destroy();
