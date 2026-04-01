@@ -24,7 +24,7 @@ If no session exists, ask the user to launch Hunk in their terminal first.
 
 Most session commands accept:
 
-- `--repo <path>` -- match by the loaded review's repo root (most common)
+- `--repo <path>` -- match the live session by its current loaded repo root (most common)
 - `<session-id>` -- match by exact ID (use when multiple sessions share a repo)
 - If only one session exists, it auto-resolves
 
@@ -33,7 +33,7 @@ Most session commands accept:
 - `--session-path <path>` -- match the live Hunk window by its current working directory
 - `--source <path>` -- load the replacement `diff` / `show` command from a different directory
 
-Use `--session-path` + `--source` when the live Hunk window and the repo you want to diff are different paths, e.g. worktree or split-session setups.
+Use `--source` only for advanced reloads where the live session you want to control is not already associated with the checkout you want to load next. For a normal worktree session, prefer selecting it directly with `--repo /path/to/worktree`.
 
 ## Commands
 
@@ -46,6 +46,7 @@ hunk session context (--repo . | <id>) [--json]
 ```
 
 - `get` shows the session `Path`, `Repo`, and `Source`, which helps when choosing between `--repo` and `--session-path`
+- `Repo` is what `--repo` matches; `Path` is what `--session-path` matches
 
 ### Navigate
 
@@ -77,11 +78,15 @@ hunk session reload --repo . -- diff
 hunk session reload --repo . -- diff main...feature -- src/ui
 hunk session reload --repo . -- show HEAD~1
 hunk session reload --repo . -- show HEAD~1 -- README.md
-hunk session reload --session-path /path/to/worktree --source /path/to/repo -- diff
+hunk session reload --repo /path/to/worktree -- diff
+hunk session reload --session-path /path/to/live-window --source /path/to/other-checkout -- diff
 ```
 
 - Always include `--` before the nested Hunk command
-- `--session-path` targets the live window; `--source` controls where the replacement review command runs
+- `--repo` or `<session-id>` usually selects the session you want
+- `--source` is advanced: it does not select the session; it only changes where the replacement review command runs
+- If the live session is already showing the target worktree, prefer `hunk session reload --repo /path/to/worktree -- diff`
+- `--session-path` targets the live window when you need to keep session selection separate from reload source
 
 ### Comments
 
@@ -129,7 +134,7 @@ Guidelines:
 - **"No visible diff file matches ..."** -- the file is not in the loaded review. Check `context`, then `reload` if needed.
 - **"No active Hunk sessions"** -- ask the user to open Hunk in their terminal.
 - **"Multiple active sessions match"** -- pass `<session-id>` explicitly.
-- **"No active Hunk session matches session path ..."** -- for worktree / split-session reloads, verify the live window `Path` via `hunk session get` or `list`, then use `--session-path`.
+- **"No active Hunk session matches session path ..."** -- for advanced split-path reloads, verify the live window `Path` via `hunk session get` or `list`, then use `--session-path`.
 - **"Pass the replacement Hunk command after `--`"** -- include `--` before the nested `diff` / `show` command.
 - **"Specify exactly one navigation target"** -- pick one of `--hunk`, `--old-line`, or `--new-line`.
 - **"Specify either --next-comment or --prev-comment, not both."** -- choose one comment-navigation direction.
