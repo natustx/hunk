@@ -17,7 +17,12 @@ import {
   type DiffSectionGeometry,
   type DiffSectionRowBounds,
 } from "../../lib/diffSectionGeometry";
-import { buildFileSectionLayouts, findHeaderOwningFileSection } from "../../lib/fileSectionLayout";
+import {
+  buildFileSectionLayouts,
+  buildInStreamFileHeaderHeights,
+  findHeaderOwningFileSection,
+  shouldRenderInStreamFileHeader,
+} from "../../lib/fileSectionLayout";
 import { diffHunkId, diffSectionId } from "../../lib/ids";
 import type { AppTheme } from "../../themes";
 import { DiffSection } from "./DiffSection";
@@ -285,10 +290,7 @@ export function DiffPane({
     };
   }, [files.length, scrollRef]);
 
-  const sectionHeaderHeights = useMemo(
-    () => files.map((_, index) => (index === 0 ? 0 : 1)),
-    [files],
-  );
+  const sectionHeaderHeights = useMemo(() => buildInStreamFileHeaderHeights(files), [files]);
 
   const baseSectionGeometry = useMemo(
     () =>
@@ -535,7 +537,7 @@ export function DiffPane({
     const wrapChanged = previousWrapLinesRef.current !== wrapLines;
     const previousSectionMetrics = previousSectionGeometryRef.current;
     const previousFiles = previousFilesRef.current;
-    const previousSectionHeaderHeights = previousFiles.map((_, index) => (index === 0 ? 0 : 1));
+    const previousSectionHeaderHeights = buildInStreamFileHeaderHeights(previousFiles);
 
     if (wrapChanged && previousSectionMetrics && previousFiles.length > 0) {
       const previousScrollTop =
@@ -851,7 +853,7 @@ export function DiffPane({
                         headerLabelWidth={headerLabelWidth}
                         headerStatsWidth={headerStatsWidth}
                         separatorWidth={separatorWidth}
-                        showHeader={index > 0}
+                        showHeader={shouldRenderInStreamFileHeader(index)}
                         showSeparator={index > 0}
                         theme={theme}
                         onSelect={() => onSelectFile(file.id)}
@@ -877,7 +879,7 @@ export function DiffPane({
                         file.id === selectedFileId ? handleSelectedHighlightReady : undefined
                       }
                       separatorWidth={separatorWidth}
-                      showHeader={index > 0}
+                      showHeader={shouldRenderInStreamFileHeader(index)}
                       showSeparator={index > 0}
                       showLineNumbers={showLineNumbers}
                       showHunkHeaders={showHunkHeaders}

@@ -11,6 +11,21 @@ export interface FileSectionLayout {
   sectionBottom: number;
 }
 
+/** Return the in-stream header height for one review section. */
+export function getInStreamFileHeaderHeight(sectionIndex: number) {
+  return sectionIndex === 0 ? 0 : 1;
+}
+
+/** Return whether one review section should render its in-stream file header. */
+export function shouldRenderInStreamFileHeader(sectionIndex: number) {
+  return getInStreamFileHeaderHeight(sectionIndex) > 0;
+}
+
+/** Build the in-stream header heights for the current review stream. */
+export function buildInStreamFileHeaderHeights(files: DiffFile[]) {
+  return files.map((_, index) => getInStreamFileHeaderHeight(index));
+}
+
 /** Build absolute section offsets from file order, header heights, and measured body heights. */
 export function buildFileSectionLayouts(
   files: DiffFile[],
