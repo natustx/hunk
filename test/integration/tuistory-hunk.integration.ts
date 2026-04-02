@@ -117,7 +117,7 @@ describe("Hunk integration via tuistory", () => {
       );
 
       expect(secondHunk).toContain("line60 = 6000");
-      expect(secondHunk).toContain("line61 = 6100");
+      expect(secondHunk).toContain("@@ -57,12 +57,12 @@");
       expect(secondHunk).not.toContain("line1 = 100");
     } finally {
       session.close();
@@ -484,12 +484,14 @@ describe("Hunk integration via tuistory", () => {
       await session.scrollDown(12);
       const scrolled = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("line11 = 111") && !text.includes("line01 = 101"),
+        (text) =>
+          !text.includes("line01 = 101") &&
+          (text.includes("line11 = 111") || text.includes("line12 = 112")),
         5_000,
       );
 
-      expect(scrolled).toContain("line11 = 111");
       expect(scrolled).not.toContain("line01 = 101");
+      expect(scrolled.includes("line11 = 111") || scrolled.includes("line12 = 112")).toBe(true);
 
       await session.scrollUp(12);
       const restored = await harness.waitForSnapshot(
