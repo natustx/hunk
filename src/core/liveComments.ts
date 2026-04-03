@@ -43,6 +43,7 @@ export function findHunkIndexForLine(file: DiffFile, side: DiffSide, line: numbe
 export function firstCommentTargetForHunk(hunk: Hunk): Omit<ResolvedCommentTarget, "hunkIndex"> {
   let deletionLineNumber = hunk.deletionStart;
   let additionLineNumber = hunk.additionStart;
+  let firstDeletionLine: number | undefined;
 
   for (const content of hunk.hunkContent) {
     if (content.type === "context") {
@@ -58,12 +59,19 @@ export function firstCommentTargetForHunk(hunk: Hunk): Omit<ResolvedCommentTarge
       };
     }
 
-    if (content.deletions > 0) {
-      return {
-        side: "old",
-        line: deletionLineNumber,
-      };
+    if (content.deletions > 0 && firstDeletionLine === undefined) {
+      firstDeletionLine = deletionLineNumber;
     }
+
+    deletionLineNumber += content.deletions;
+    additionLineNumber += content.additions;
+  }
+
+  if (firstDeletionLine !== undefined) {
+    return {
+      side: "old",
+      line: firstDeletionLine,
+    };
   }
 
   const fallbackRange = hunkLineRange(hunk);
