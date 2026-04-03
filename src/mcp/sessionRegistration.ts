@@ -1,14 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import type { AppBootstrap } from "../core/types";
+import { formatHunkHeader } from "../core/hunkHeader";
 import { hunkLineRange } from "../core/liveComments";
+import type { AppBootstrap } from "../core/types";
 import { resolveSessionTerminalMetadata } from "./sessionTerminalMetadata";
-import type {
-  HunkSessionRegistration,
-  HunkSessionSnapshot,
-  SessionFileSummary,
-  SessionReviewFile,
-} from "./types";
+import type { HunkSessionRegistration, HunkSessionSnapshot, SessionReviewFile } from "./types";
 
 /** Resolve the TTY device path for the current process, if available. */
 function ttyname(): string | undefined {
@@ -33,25 +29,6 @@ function inferRepoRoot(bootstrap: AppBootstrap) {
     : undefined;
 }
 
-function buildSessionFiles(bootstrap: AppBootstrap): SessionFileSummary[] {
-  return bootstrap.changeset.files.map((file) => ({
-    id: file.id,
-    path: file.path,
-    previousPath: file.previousPath,
-    additions: file.stats.additions,
-    deletions: file.stats.deletions,
-    hunkCount: file.metadata.hunks.length,
-  }));
-}
-
-function formatHunkHeader(file: AppBootstrap["changeset"]["files"][number], hunkIndex: number) {
-  const hunk = file.metadata.hunks[hunkIndex]!;
-  const specs =
-    hunk.hunkSpecs ??
-    `@@ -${hunk.deletionStart},${hunk.deletionLines} +${hunk.additionStart},${hunk.additionLines} @@`;
-  return hunk.hunkContext ? `${specs} ${hunk.hunkContext}` : specs;
-}
-
 function buildSessionReviewFiles(bootstrap: AppBootstrap): SessionReviewFile[] {
   return bootstrap.changeset.files.map((file) => ({
     id: file.id,
@@ -61,10 +38,10 @@ function buildSessionReviewFiles(bootstrap: AppBootstrap): SessionReviewFile[] {
     deletions: file.stats.deletions,
     hunkCount: file.metadata.hunks.length,
     patch: file.patch,
-    hunks: file.metadata.hunks.map((_, index) => ({
+    hunks: file.metadata.hunks.map((hunk, index) => ({
       index,
-      header: formatHunkHeader(file, index),
-      ...hunkLineRange(file.metadata.hunks[index]!),
+      header: formatHunkHeader(hunk),
+      ...hunkLineRange(hunk),
     })),
   }));
 }
@@ -83,7 +60,6 @@ export function createSessionRegistration(bootstrap: AppBootstrap): HunkSessionR
     sourceLabel: bootstrap.changeset.sourceLabel,
     launchedAt: new Date().toISOString(),
     terminal,
-    files: buildSessionFiles(bootstrap),
     reviewFiles: buildSessionReviewFiles(bootstrap),
   };
 }
@@ -99,7 +75,6 @@ export function updateSessionRegistration(
     inputKind: bootstrap.input.kind,
     title: bootstrap.changeset.title,
     sourceLabel: bootstrap.changeset.sourceLabel,
-    files: buildSessionFiles(bootstrap),
     reviewFiles: buildSessionReviewFiles(bootstrap),
   };
 }

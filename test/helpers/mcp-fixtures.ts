@@ -69,19 +69,7 @@ export function createTestSessionSnapshot(
 export function createTestSessionRegistration(
   overrides: Partial<HunkSessionRegistration> = {},
 ): HunkSessionRegistration {
-  const reviewFiles =
-    overrides.reviewFiles ??
-    (overrides.files ?? [createTestSessionFileSummary()]).map((file) =>
-      createTestSessionReviewFile({
-        id: file.id,
-        path: file.path,
-        previousPath: file.previousPath,
-        additions: file.additions,
-        deletions: file.deletions,
-        hunkCount: file.hunkCount,
-      }),
-    );
-  const files = overrides.files ?? reviewFiles.map(summarizeReviewFile);
+  const reviewFiles = overrides.reviewFiles ?? [createTestSessionReviewFile()];
 
   return {
     sessionId: "session-1",
@@ -92,16 +80,15 @@ export function createTestSessionRegistration(
     title: "repo working tree",
     sourceLabel: "/repo",
     launchedAt: "2026-03-22T00:00:00.000Z",
-    files,
     reviewFiles,
     ...overrides,
-    files,
     reviewFiles,
   };
 }
 
 export function createTestListedSession(overrides: Partial<ListedSession> = {}): ListedSession {
   const files = overrides.files ?? [createTestSessionFileSummary()];
+  const snapshot = overrides.snapshot ?? createTestSessionSnapshot();
 
   return {
     sessionId: "session-1",
@@ -114,11 +101,11 @@ export function createTestListedSession(overrides: Partial<ListedSession> = {}):
     launchedAt: "2026-03-22T00:00:00.000Z",
     fileCount: overrides.fileCount ?? files.length,
     files,
-    snapshot: overrides.snapshot ?? createTestSessionSnapshot(),
+    snapshot,
     ...overrides,
     fileCount: overrides.fileCount ?? files.length,
     files,
-    snapshot: overrides.snapshot ?? createTestSessionSnapshot(),
+    snapshot,
   };
 }
 
@@ -166,7 +153,8 @@ export function createTestSessionReview(
   overrides: Partial<SessionReview> = {},
 ): SessionReview {
   const files = overrides.files ?? [createTestSessionReviewFile()];
-  const selectedFile = overrides.selectedFile === undefined ? (files[0] ?? null) : overrides.selectedFile;
+  const selectedFile =
+    overrides.selectedFile === undefined ? (files[0] ?? null) : overrides.selectedFile;
   const selectedHunk =
     overrides.selectedHunk === undefined ? (selectedFile?.hunks[0] ?? null) : overrides.selectedHunk;
 
@@ -186,4 +174,15 @@ export function createTestSessionReview(
     selectedHunk,
     files,
   };
+}
+
+export function createTestListedSessionFromReviewFiles(
+  reviewFiles: SessionReviewFile[],
+  overrides: Partial<ListedSession> = {},
+): ListedSession {
+  return createTestListedSession({
+    fileCount: reviewFiles.length,
+    files: reviewFiles.map(summarizeReviewFile),
+    ...overrides,
+  });
 }

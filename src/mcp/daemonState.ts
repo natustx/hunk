@@ -15,6 +15,7 @@ import type {
   RemovedCommentResult,
   SelectedSessionContext,
   SessionCommandResult,
+  SessionFileSummary,
   SessionReview,
   SessionReviewFile,
   SessionServerMessage,
@@ -70,6 +71,17 @@ function findSelectedReviewFile(reviewFiles: SessionReviewFile[], snapshot: Hunk
         file.previousPath === snapshot.selectedFilePath,
     ) ?? null
   );
+}
+
+function summarizeReviewFile(reviewFile: SessionReviewFile): SessionFileSummary {
+  return {
+    id: reviewFile.id,
+    path: reviewFile.path,
+    previousPath: reviewFile.previousPath,
+    additions: reviewFile.additions,
+    deletions: reviewFile.deletions,
+    hunkCount: reviewFile.hunkCount,
+  };
 }
 
 /** Resolve which live Hunk session one external command should target. */
@@ -150,8 +162,8 @@ export class HunkDaemonState {
         sourceLabel: entry.registration.sourceLabel,
         launchedAt: entry.registration.launchedAt,
         terminal: entry.registration.terminal,
-        fileCount: entry.registration.files.length,
-        files: entry.registration.files,
+        fileCount: entry.registration.reviewFiles.length,
+        files: entry.registration.reviewFiles.map(summarizeReviewFile),
         snapshot: entry.snapshot,
       }))
       .sort((left, right) => right.snapshot.updatedAt.localeCompare(left.snapshot.updatedAt));

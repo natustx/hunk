@@ -60,7 +60,6 @@ export interface HunkSessionRegistration {
   sourceLabel: string;
   launchedAt: string;
   terminal?: SessionTerminalMetadata;
-  files: SessionFileSummary[];
   reviewFiles: SessionReviewFile[];
 }
 
