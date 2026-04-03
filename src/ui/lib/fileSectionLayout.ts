@@ -37,7 +37,7 @@ export function buildFileSectionLayouts(
 
   files.forEach((file, index) => {
     const separatorHeight = index > 0 ? 1 : 0;
-    const headerHeight = Math.max(0, headerHeights?.[index] ?? 1);
+    const headerHeight = Math.max(0, headerHeights?.[index] ?? getInStreamFileHeaderHeight(index));
     const bodyHeight = Math.max(0, bodyHeights[index] ?? 0);
     const sectionTop = cursor;
     const headerTop = sectionTop + separatorHeight;
