@@ -4,6 +4,7 @@ import {
   buildLiveComment,
   findDiffFileByPath,
   findHunkIndexForLine,
+  firstCommentTargetForHunk,
   hunkLineRange,
   resolveCommentTarget,
 } from "../src/core/liveComments";
@@ -122,6 +123,25 @@ describe("live comment helpers", () => {
       hunkIndex: 0,
       side: "new",
       line: 10,
+    });
+  });
+
+  test("prefers a later addition over an earlier deletion-only chunk", () => {
+    const target = firstCommentTargetForHunk({
+      additionStart: 20,
+      additionLines: 1,
+      deletionStart: 20,
+      deletionLines: 1,
+      hunkContent: [
+        { type: "change", deletions: 1, additions: 0 },
+        { type: "context", lines: 2 },
+        { type: "change", deletions: 0, additions: 1 },
+      ],
+    } as Parameters<typeof firstCommentTargetForHunk>[0]);
+
+    expect(target).toEqual({
+      side: "new",
+      line: 22,
     });
   });
 
