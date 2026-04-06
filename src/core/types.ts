@@ -160,7 +160,7 @@ export interface SessionCommentApplyCommandInput {
   output: SessionCommandOutput;
   selector: SessionSelectorInput;
   comments: SessionCommentApplyItemInput[];
-  revealMode: "none" | "last";
+  revealMode: "none" | "first";
 }
 
 export interface SessionCommentListCommandInput {

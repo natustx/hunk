@@ -924,7 +924,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
         .argument("[sessionId]")
         .option("--repo <path>", "target the live session whose repo root matches this path")
         .option("--stdin", "read the comment batch from stdin as JSON")
-        .option("--focus", "apply the batch and focus the final note")
+        .option("--focus", "apply the batch and focus the first note")
         .option("--json", "emit structured JSON");
 
       let parsedSessionId: string | undefined;
@@ -988,7 +988,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
         output: resolveJsonOutput(parsedOptions),
         selector: resolveExplicitSessionSelector(parsedSessionId, parsedOptions.repo),
         comments,
-        revealMode: parsedOptions.focus ? "last" : "none",
+        revealMode: parsedOptions.focus ? "first" : "none",
       };
     }
 

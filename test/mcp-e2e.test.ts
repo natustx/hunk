@@ -234,6 +234,7 @@ describe("live session end-to-end", () => {
           "Injected after the Hunk session auto-started the local daemon.",
           "--author",
           "Pi",
+          "--focus",
           "--json",
         ],
         port,
@@ -441,6 +442,7 @@ describe("live session end-to-end", () => {
           "Alpha note",
           "--rationale",
           "Delivered only to the alpha Hunk session.",
+          "--focus",
         ],
         port,
       );
@@ -459,6 +461,7 @@ describe("live session end-to-end", () => {
           "Beta note",
           "--rationale",
           "Delivered only to the beta Hunk session.",
+          "--focus",
         ],
         port,
       );

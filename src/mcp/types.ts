@@ -81,7 +81,7 @@ export interface CommentBatchItemInput extends CommentTargetInput {}
 
 export interface CommentBatchToolInput extends SessionTargetInput {
   comments: CommentBatchItemInput[];
-  revealMode?: "none" | "last";
+  revealMode?: "none" | "first";
 }
 
 export interface NavigateToFileToolInput extends SessionTargetInput {

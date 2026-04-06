@@ -512,4 +512,123 @@ describe("session CLI", () => {
       await session.exited;
     }
   }, 20_000);
+
+  test("comment apply with --focus jumps to the first applied comment", async () => {
+    if (!ttyToolsAvailable) {
+      return;
+    }
+
+    const port = 48965;
+    const fixture = createFixtureFiles(
+      "apply-batch-focus",
+      [
+        "export const one = 1;",
+        "export const two = 2;",
+        "export const three = 3;",
+        "export const four = 4;",
+        "export const five = 5;",
+        "export const six = 6;",
+        "export const seven = 7;",
+        "export const eight = 8;",
+        "export const nine = 9;",
+        "export const ten = 10;",
+        "export const eleven = 11;",
+        "export const twelve = 12;",
+        "export const thirteen = 13;",
+      ],
+      [
+        "export const one = 1;",
+        "export const two = 20;",
+        "export const three = 3;",
+        "export const four = 4;",
+        "export const five = 5;",
+        "export const six = 6;",
+        "export const seven = 7;",
+        "export const eight = 8;",
+        "export const nine = 9;",
+        "export const ten = 10;",
+        "export const eleven = 11;",
+        "export const twelve = 12;",
+        "export const thirteen = 130;",
+      ],
+    );
+    const session = spawnHunkSession(fixture, { port, quitAfterSeconds: 18, timeoutSeconds: 20 });
+
+    try {
+      const listed = await waitUntil("registered live session", () => {
+        const { proc, stdout } = runSessionCli(["list", "--json"], port);
+        if (proc.exitCode !== 0) {
+          return null;
+        }
+
+        const parsed = JSON.parse(stdout) as SessionListJson;
+        return parsed.sessions.length > 0 ? parsed.sessions : null;
+      });
+
+      const sessionId = listed[0]!.sessionId;
+      const navigate = runSessionCli(
+        ["navigate", sessionId, "--file", fixture.afterName, "--hunk", "2", "--json"],
+        port,
+      );
+      expect(navigate.proc.exitCode).toBe(0);
+
+      await waitUntil("second hunk selection", () => {
+        const context = runSessionCli(["context", sessionId, "--json"], port);
+        if (context.proc.exitCode !== 0) {
+          return null;
+        }
+
+        const parsed = JSON.parse(context.stdout) as {
+          context?: { selectedHunk?: { index: number } };
+        };
+        return parsed.context?.selectedHunk?.index === 1 ? parsed : null;
+      });
+
+      const apply = runSessionCli(
+        ["comment", "apply", sessionId, "--stdin", "--focus", "--json"],
+        port,
+        JSON.stringify({
+          comments: [
+            {
+              filePath: fixture.afterName,
+              hunk: 1,
+              summary: "First hunk note",
+              author: "Pi",
+            },
+            {
+              filePath: fixture.afterName,
+              hunk: 2,
+              summary: "Second hunk note",
+              author: "Pi",
+            },
+          ],
+        }),
+      );
+      expect(apply.proc.exitCode).toBe(0);
+      expect(apply.stderr).toBe("");
+
+      const focused = await waitUntil("first hunk selection after focused batch apply", () => {
+        const context = runSessionCli(["context", sessionId, "--json"], port);
+        if (context.proc.exitCode !== 0) {
+          return null;
+        }
+
+        const parsed = JSON.parse(context.stdout) as {
+          context?: { selectedHunk?: { index: number } };
+        };
+        return parsed.context?.selectedHunk?.index === 0 ? parsed : null;
+      });
+
+      expect(focused).toMatchObject({
+        context: {
+          selectedHunk: {
+            index: 0,
+          },
+        },
+      });
+    } finally {
+      session.kill();
+      await session.exited;
+    }
+  }, 20_000);
 });

@@ -410,7 +410,9 @@ describe("parseCli", () => {
       new ReadableStream({
         start(controller) {
           controller.enqueue(
-            '{"comments":[{"filePath":"README.md","hunk":2,"summary":"Explain this hunk"}]}',
+            new TextEncoder().encode(
+              '{"comments":[{"filePath":"README.md","hunk":2,"summary":"Explain this hunk"}]}',
+            ),
           );
           controller.close();
         },
@@ -440,7 +442,7 @@ describe("parseCli", () => {
             summary: "Explain this hunk",
           },
         ],
-        revealMode: "last",
+        revealMode: "first",
         output: "json",
       });
     } finally {

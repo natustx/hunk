@@ -231,9 +231,9 @@ export function useHunkSessionBridge({
         return next;
       });
 
-      if (message.input.revealMode === "last" && prepared.length > 0) {
-        const last = prepared.at(-1)!;
-        jumpToFile(last.file.id, last.target.hunkIndex);
+      if (message.input.revealMode === "first" && prepared.length > 0) {
+        const first = prepared[0]!;
+        jumpToFile(first.file.id, first.target.hunkIndex);
         openAgentNotes();
       }
 

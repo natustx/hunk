@@ -104,7 +104,7 @@ hunk session comment clear --repo . --yes [--file README.md]
 - `comment add` requires `--file`, `--summary`, and exactly one of `--hunk`, `--old-line`, or `--new-line`
 - `comment apply` payload items require `filePath`, `summary`, and one target such as `hunk`, `oldLine`, or `newLine`
 - Prefer `--hunk <n>` when you want to annotate the whole diff hunk instead of picking a single line manually
-- `comment add` and `comment apply` both keep the current focus by default; pass `--focus` when you want to jump to the new note or the last note in a batch
+- `comment add` and `comment apply` both keep the current focus by default; pass `--focus` when you want to jump to the new note or the first note in a batch
 - `comment apply` reads a JSON batch from stdin and validates the full batch before mutating the live session
 - `comment list` and `comment clear` accept optional `--file`
 - Quote `--summary` and `--rationale` defensively in the shell
