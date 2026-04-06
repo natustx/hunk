@@ -26,6 +26,8 @@ import { resolveTheme, THEMES } from "./themes";
 
 type FocusArea = "files" | "filter";
 
+const FAST_CODE_HORIZONTAL_SCROLL_COLUMNS = 8;
+
 const LazyHelpDialog = lazy(async () => ({
   default: (await import("./components/chrome/HelpDialog")).HelpDialog,
 }));
@@ -280,6 +282,7 @@ export function App({
     // Capture the pre-toggle viewport position synchronously so DiffPane can restore the same
     // top-most source row after wrapped row heights change.
     wrapToggleScrollTopRef.current = diffScrollRef.current?.scrollTop ?? 0;
+    setCodeHorizontalOffset(0);
     setWrapLines((current) => !current);
   };
 
@@ -704,6 +707,9 @@ export function App({
           theme={activeTheme}
           width={diffPaneWidth}
           onOpenAgentNotesAtHunk={openAgentNotesAtHunk}
+          onScrollCodeHorizontally={(delta) => {
+            scrollCodeHorizontally(delta * FAST_CODE_HORIZONTAL_SCROLL_COLUMNS);
+          }}
           onSelectFile={jumpToFile}
         />
       </box>

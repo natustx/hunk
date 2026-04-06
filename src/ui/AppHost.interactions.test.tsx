@@ -496,6 +496,155 @@ describe("App interactions", () => {
     }
   });
 
+  test("shift plus left and right arrows scroll code horizontally faster", async () => {
+    const setup = await testRender(<AppHost bootstrap={createWrapBootstrap()} />, {
+      width: 92,
+      height: 20,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("this is a very");
+      expect(frame).not.toContain("interaction coverage");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockInput.pressArrow("right", { shift: true });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("interaction coverage")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("interaction coverage");
+      expect(frame).not.toContain("this is a very");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockInput.pressArrow("left", { shift: true });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("this is a very")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("this is a very");
+      expect(frame).not.toContain("interaction coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("shift plus mouse wheel scrolls code horizontally", async () => {
+    const setup = await testRender(<AppHost bootstrap={createWrapBootstrap()} />, {
+      width: 92,
+      height: 20,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("this is a very");
+      expect(frame).not.toContain("interaction coverage");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockMouse.scroll(60, 10, "down", { modifiers: { shift: true } });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("interaction coverage")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("interaction coverage");
+      expect(frame).not.toContain("this is a very");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockMouse.scroll(60, 10, "up", { modifiers: { shift: true } });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("this is a very")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("this is a very");
+      expect(frame).not.toContain("interaction coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("wrap toggles reset the horizontal code offset", async () => {
+    const setup = await testRender(<AppHost bootstrap={createWrapBootstrap()} />, {
+      width: 92,
+      height: 20,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("this is a very");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockInput.pressArrow("right", { shift: true });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("interaction coverage")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("interaction coverage");
+      expect(frame).not.toContain("this is a very");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await settleWrapToggle(setup);
+
+      frame = await waitForFrame(setup, (nextFrame) => nextFrame.includes("overage';"));
+      expect(frame).toContain("this is a very");
+      expect(frame).toContain("long wrapped line");
+      expect(frame).toContain("overage';");
+
+      await act(async () => {
+        await setup.mockInput.typeText("w");
+      });
+      await settleWrapToggle(setup);
+
+      frame = await waitForFrame(
+        setup,
+        (nextFrame) =>
+          nextFrame.includes("this is a very") && !nextFrame.includes("interaction coverage"),
+      );
+      expect(frame).toContain("this is a very");
+      expect(frame).not.toContain("interaction coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
   test("bootstrap preferences initialize the visible view state", async () => {
     const setup = await testRender(
       <AppHost

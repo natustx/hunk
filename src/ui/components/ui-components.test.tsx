@@ -1268,7 +1268,7 @@ describe("UI components", () => {
       "d / u           half page down / up",
       "[ / ]           previous / next hunk",
       "{ / }           previous / next comment",
-      "← / →           scroll code left / right",
+      "← / →           scroll code (Shift = faster)",
       "Home / End      jump to top / bottom",
       "View",
       "1 / 2 / 0       split / stack / auto",

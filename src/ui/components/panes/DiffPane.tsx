@@ -1,4 +1,4 @@
-import type { ScrollBoxRenderable } from "@opentui/core";
+import { type MouseEvent as TuiMouseEvent, type ScrollBoxRenderable } from "@opentui/core";
 import { useRenderer } from "@opentui/react";
 import {
   useCallback,
@@ -148,6 +148,7 @@ export function DiffPane({
   theme,
   width,
   onOpenAgentNotesAtHunk,
+  onScrollCodeHorizontally = () => {},
   onSelectFile,
 }: {
   codeHorizontalOffset?: number;
@@ -171,6 +172,7 @@ export function DiffPane({
   theme: AppTheme;
   width: number;
   onOpenAgentNotesAtHunk: (fileId: string, hunkIndex: number) => void;
+  onScrollCodeHorizontally?: (delta: number) => void;
   onSelectFile: (fileId: string) => void;
 }) {
   const renderer = useRenderer();
@@ -214,6 +216,32 @@ export function DiffPane({
 
     setPrefetchAnchorKey((current) => current ?? selectedHighlightKey);
   }, [selectedHighlightKey]);
+
+  /** Route shifted wheel input into horizontal code-column scrolling without disturbing vertical review scroll. */
+  const handleMouseScroll = useCallback(
+    (event: TuiMouseEvent) => {
+      const direction = event.scroll?.direction;
+      if (!direction || wrapLines) {
+        return;
+      }
+
+      if (direction === "left") {
+        onScrollCodeHorizontally(-1);
+      } else if (direction === "right") {
+        onScrollCodeHorizontally(1);
+      } else if (event.modifiers.shift && direction === "up") {
+        onScrollCodeHorizontally(-1);
+      } else if (event.modifiers.shift && direction === "down") {
+        onScrollCodeHorizontally(1);
+      } else {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [onScrollCodeHorizontally, wrapLines],
+  );
 
   const allAgentNotesByFile = useMemo(() => {
     const next = new Map<string, VisibleAgentNote[]>();
@@ -830,6 +858,7 @@ export function DiffPane({
               contentOptions={{ backgroundColor: theme.panel }}
               verticalScrollbarOptions={{ visible: false }}
               horizontalScrollbarOptions={{ visible: false }}
+              onMouseScroll={handleMouseScroll}
             >
               <box
                 // Remount the diff content when width/layout/wrap mode changes so viewport culling
