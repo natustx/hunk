@@ -349,6 +349,27 @@ export function DiffPane({
     }, 120);
   }, []);
 
+  /**
+   * Combine the existing horizontal-wheel handler with viewport-centered selection sync.
+   * Horizontal gestures should keep their current behavior without changing the active hunk.
+   */
+  const handleDiffPaneMouseScroll = useCallback(
+    (event: TuiMouseEvent) => {
+      const direction = event.scroll?.direction;
+      const isHorizontalGesture =
+        direction === "left" ||
+        direction === "right" ||
+        (event.modifiers.shift && (direction === "up" || direction === "down"));
+
+      if (!isHorizontalGesture) {
+        armMouseScrollSelectionSync();
+      }
+
+      handleMouseScroll(event);
+    },
+    [armMouseScrollSelectionSync, handleMouseScroll],
+  );
+
   useEffect(() => {
     return () => {
       if (mouseScrollSelectionSyncTimeoutRef.current) {
@@ -1008,14 +1029,13 @@ export function DiffPane({
               scrollY={true}
               viewportCulling={true}
               focused={pagerMode}
-              onMouseScroll={armMouseScrollSelectionSync}
+              onMouseScroll={handleDiffPaneMouseScroll}
               rootOptions={{ backgroundColor: theme.panel }}
               wrapperOptions={{ backgroundColor: theme.panel }}
               viewportOptions={{ backgroundColor: theme.panel }}
               contentOptions={{ backgroundColor: theme.panel }}
               verticalScrollbarOptions={{ visible: false }}
               horizontalScrollbarOptions={{ visible: false }}
-              onMouseScroll={handleMouseScroll}
             >
               <box
                 // Remount the diff content when width/layout/wrap mode changes so viewport culling
