@@ -22,6 +22,7 @@ import {
   buildInStreamFileHeaderHeights,
   findHeaderOwningFileSection,
   shouldRenderInStreamFileHeader,
+  type FileSectionLayout,
 } from "../../lib/fileSectionLayout";
 import { diffHunkId, diffSectionId } from "../../lib/ids";
 import { findViewportCenteredHunkTarget } from "../../lib/viewportSelection";
@@ -127,6 +128,73 @@ function resolveViewportRowAnchorTop(
   return 0;
 }
 
+/** Keep syntax-highlight warm for the files immediately adjacent to the current selection. */
+function buildAdjacentPrefetchFileIds(files: DiffFile[], selectedFileId?: string) {
+  if (!selectedFileId) {
+    return new Set<string>();
+  }
+
+  const selectedIndex = files.findIndex((file) => file.id === selectedFileId);
+  if (selectedIndex < 0) {
+    return new Set<string>();
+  }
+
+  const next = new Set<string>();
+  const previousFile = files[selectedIndex - 1];
+  const nextFile = files[selectedIndex + 1];
+
+  if (previousFile) {
+    next.add(previousFile.id);
+  }
+
+  if (nextFile) {
+    next.add(nextFile.id);
+  }
+
+  return next;
+}
+
+/**
+ * Start highlight work before files visibly enter the review stream.
+ *
+ * We intentionally include three groups:
+ * - the selected file, so direct navigation always warms the active target
+ * - adjacent files, so hunk/file navigation does not wait on a cold highlight
+ * - files within a larger viewport halo, so wheel/track scrolling sees colorized rows already ready
+ */
+function buildHighlightPrefetchFileIds({
+  adjacentPrefetchFileIds,
+  fileSectionLayouts,
+  scrollTop,
+  viewportHeight,
+  selectedFileId,
+}: {
+  adjacentPrefetchFileIds: Set<string>;
+  fileSectionLayouts: FileSectionLayout[];
+  scrollTop: number;
+  viewportHeight: number;
+  selectedFileId?: string;
+}) {
+  const next = new Set(adjacentPrefetchFileIds);
+
+  if (selectedFileId) {
+    next.add(selectedFileId);
+  }
+
+  const clampedViewportHeight = Math.max(1, viewportHeight);
+  const prefetchRows = Math.max(24, clampedViewportHeight * 3);
+  const minPrefetchY = Math.max(0, scrollTop - prefetchRows);
+  const maxPrefetchY = scrollTop + viewportHeight + prefetchRows;
+
+  for (const layout of fileSectionLayouts) {
+    if (layout.sectionBottom >= minPrefetchY && layout.sectionTop <= maxPrefetchY) {
+      next.add(layout.fileId);
+    }
+  }
+
+  return next;
+}
+
 /** Render the main multi-file review stream. */
 export function DiffPane({
   diffContentWidth,
@@ -177,30 +245,10 @@ export function DiffPane({
 }) {
   const renderer = useRenderer();
 
-  const adjacentPrefetchFileIds = useMemo(() => {
-    if (!selectedFileId) {
-      return new Set<string>();
-    }
-
-    const selectedIndex = files.findIndex((file) => file.id === selectedFileId);
-    if (selectedIndex < 0) {
-      return new Set<string>();
-    }
-
-    const next = new Set<string>();
-    const previousFile = files[selectedIndex - 1];
-    const nextFile = files[selectedIndex + 1];
-
-    if (previousFile) {
-      next.add(previousFile.id);
-    }
-
-    if (nextFile) {
-      next.add(nextFile.id);
-    }
-
-    return next;
-  }, [files, selectedFileId]);
+  const adjacentPrefetchFileIds = useMemo(
+    () => buildAdjacentPrefetchFileIds(files, selectedFileId),
+    [files, selectedFileId],
+  );
 
   const allAgentNotesByFile = useMemo(() => {
     const next = new Map<string, VisibleAgentNote[]>();
@@ -261,6 +309,8 @@ export function DiffPane({
     };
   }, []);
 
+  // Mirror the imperative OpenTUI scrollbox state into React state so geometry planning,
+  // windowing, pinned-header ownership, and prefetching can all read the same viewport snapshot.
   useEffect(() => {
     const scrollBox = scrollRef.current;
     if (!scrollBox) {
@@ -403,33 +453,26 @@ export function DiffPane({
   );
   const totalContentHeight = fileSectionLayouts[fileSectionLayouts.length - 1]?.sectionBottom ?? 0;
 
-  const highlightPrefetchFileIds = useMemo(() => {
-    const next = new Set(adjacentPrefetchFileIds);
+  const highlightPrefetchFileIds = useMemo(
+    () =>
+      buildHighlightPrefetchFileIds({
+        adjacentPrefetchFileIds,
+        fileSectionLayouts,
+        scrollTop: scrollViewport.top,
+        viewportHeight: scrollViewport.height,
+        selectedFileId,
+      }),
+    [
+      adjacentPrefetchFileIds,
+      fileSectionLayouts,
+      scrollViewport.height,
+      scrollViewport.top,
+      selectedFileId,
+    ],
+  );
 
-    if (selectedFileId) {
-      next.add(selectedFileId);
-    }
-
-    const viewportHeight = Math.max(1, scrollViewport.height);
-    const prefetchRows = Math.max(24, viewportHeight * 3);
-    const minPrefetchY = Math.max(0, scrollViewport.top - prefetchRows);
-    const maxPrefetchY = scrollViewport.top + scrollViewport.height + prefetchRows;
-
-    for (const layout of fileSectionLayouts) {
-      if (layout.sectionBottom >= minPrefetchY && layout.sectionTop <= maxPrefetchY) {
-        next.add(layout.fileId);
-      }
-    }
-
-    return next;
-  }, [
-    adjacentPrefetchFileIds,
-    fileSectionLayouts,
-    scrollViewport.height,
-    scrollViewport.top,
-    selectedFileId,
-  ]);
-
+  // Kick off highlight work from viewport planning rather than waiting for the section to mount.
+  // That avoids the "plain rows first, color later" stutter when a file is about to scroll onscreen.
   useEffect(() => {
     if (files.length === 0) {
       return;
@@ -451,6 +494,8 @@ export function DiffPane({
   // immediately after imperative scrolls instead of waiting for the polled viewport snapshot.
   const effectiveScrollTop = scrollRef.current?.scrollTop ?? scrollViewport.top;
 
+  // While the wheel is actively scrolling, selection follows the viewport center instead of
+  // driving the viewport. That keeps sidebar state in sync without introducing scroll snap-back.
   useLayoutEffect(() => {
     if (
       !onViewportCenteredHunkChange ||

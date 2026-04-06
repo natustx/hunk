@@ -96,6 +96,27 @@ export function prefetchHighlightedDiff({
   return ensureHighlightedDiffLoaded(file, appearance);
 }
 
+/** Read the best already-available highlight result without starting async work during render. */
+function resolveHighlightedSnapshot({
+  appearanceCacheKey,
+  highlighted,
+  highlightedCacheKey,
+}: {
+  appearanceCacheKey: string | null;
+  highlighted: HighlightedDiffCode | null;
+  highlightedCacheKey: string | null;
+}) {
+  if (!appearanceCacheKey) {
+    return null;
+  }
+
+  if (highlightedCacheKey === appearanceCacheKey) {
+    return highlighted;
+  }
+
+  return SHARED_HIGHLIGHTED_DIFF_CACHE.get(appearanceCacheKey) ?? null;
+}
+
 /** Resolve highlighted diff content with shared caching and background prefetch support. */
 export function useHighlightedDiff({
   file,
@@ -110,6 +131,8 @@ export function useHighlightedDiff({
   const [highlightedCacheKey, setHighlightedCacheKey] = useState<string | null>(null);
   const appearanceCacheKey = file ? buildCacheKey(appearance, file) : null;
 
+  // Use a layout effect so a newly available cached result can replace the plain-text fallback
+  // before the next diff paint whenever possible. That reduces flash/stutter as files enter view.
   useLayoutEffect(() => {
     if (!file || !appearanceCacheKey) {
       setHighlighted(null);
@@ -150,9 +173,9 @@ export function useHighlightedDiff({
   }, [appearance, appearanceCacheKey, file, highlightedCacheKey, shouldLoadHighlight]);
 
   // Prefer cached highlights during render so revisiting a file can paint immediately.
-  return appearanceCacheKey && highlightedCacheKey === appearanceCacheKey
-    ? highlighted
-    : appearanceCacheKey
-      ? (SHARED_HIGHLIGHTED_DIFF_CACHE.get(appearanceCacheKey) ?? null)
-      : null;
+  return resolveHighlightedSnapshot({
+    appearanceCacheKey,
+    highlighted,
+    highlightedCacheKey,
+  });
 }
