@@ -8,6 +8,7 @@ import type { AppTheme } from "../../themes";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
 
 interface DiffSectionProps {
+  codeHorizontalOffset: number;
   file: DiffFile;
   headerLabelWidth: number;
   headerStatsWidth: number;
@@ -29,6 +30,7 @@ interface DiffSectionProps {
 
 /** Render one file section in the main review stream. */
 function DiffSectionComponent({
+  codeHorizontalOffset,
   file,
   headerLabelWidth,
   headerStatsWidth,
@@ -89,6 +91,7 @@ function DiffSectionComponent({
         showLineNumbers={showLineNumbers}
         showHunkHeaders={showHunkHeaders}
         wrapLines={wrapLines}
+        codeHorizontalOffset={codeHorizontalOffset}
         theme={theme}
         width={viewWidth}
         annotatedHunkIndices={annotatedHunkIndices}
@@ -107,6 +110,7 @@ function DiffSectionComponent({
 export const DiffSection = memo(DiffSectionComponent, (previous, next) => {
   // This comparator relies on stable upstream object identity for files and visible-note arrays.
   return (
+    previous.codeHorizontalOffset === next.codeHorizontalOffset &&
     previous.file === next.file &&
     previous.headerLabelWidth === next.headerLabelWidth &&
     previous.headerStatsWidth === next.headerStatsWidth &&
