@@ -4,10 +4,11 @@ import { AgentInlineNote, AgentInlineNoteGuideCap } from "../components/panes/Ag
 import type { VisibleAgentNote } from "../lib/agentAnnotations";
 import { reviewRowId } from "../lib/ids";
 import type { AppTheme } from "../themes";
+import { findMaxLineNumber } from "./codeColumns";
 import { buildSplitRows, buildStackRows } from "./pierre";
 import { plannedReviewRowVisible } from "./plannedReviewRows";
 import { buildReviewRenderPlan } from "./reviewRenderPlan";
-import { diffMessage, DiffRowView, findMaxLineNumber, fitText } from "./renderRows";
+import { diffMessage, DiffRowView, fitText } from "./renderRows";
 import { useHighlightedDiff } from "./useHighlightedDiff";
 
 const EMPTY_ANNOTATED_HUNK_INDICES = new Set<number>();

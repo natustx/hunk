@@ -220,10 +220,14 @@ export function DiffPane({
   /** Route shifted wheel input into horizontal code-column scrolling without disturbing vertical review scroll. */
   const handleMouseScroll = useCallback(
     (event: TuiMouseEvent) => {
+      const scrollBox = scrollRef.current;
       const direction = event.scroll?.direction;
-      if (!direction || wrapLines) {
+      if (!direction || !scrollBox || wrapLines) {
         return;
       }
+
+      const preservedScrollTop = scrollBox.scrollTop;
+      const preservedScrollLeft = scrollBox.scrollLeft;
 
       if (direction === "left") {
         onScrollCodeHorizontally(-1);
@@ -237,10 +241,21 @@ export function DiffPane({
         return;
       }
 
+      // OpenTUI runs ScrollBox's own wheel handler after this listener and it does not honor
+      // preventDefault(), so restore the pre-event viewport position on the next microtask.
+      queueMicrotask(() => {
+        const currentScrollBox = scrollRef.current;
+        if (!currentScrollBox) {
+          return;
+        }
+
+        currentScrollBox.scrollTo({ x: preservedScrollLeft, y: preservedScrollTop });
+      });
+
       event.preventDefault();
       event.stopPropagation();
     },
-    [onScrollCodeHorizontally, wrapLines],
+    [onScrollCodeHorizontally, scrollRef, wrapLines],
   );
 
   const allAgentNotesByFile = useMemo(() => {

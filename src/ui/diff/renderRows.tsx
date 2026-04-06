@@ -1,6 +1,11 @@
 import { memo, type ReactNode } from "react";
 import type { DiffFile } from "../../core/types";
 import type { AppTheme } from "../themes";
+import {
+  resolveSplitCellGeometry,
+  resolveSplitPaneWidths,
+  resolveStackCellGeometry,
+} from "./codeColumns";
 import type { DiffRow, RenderSpan, SplitLineCell, StackLineCell } from "./pierre";
 
 /** Clamp a label to one terminal row with an ellipsis. */
@@ -314,9 +319,12 @@ function buildWrappedSplitCell(
   theme: AppTheme,
 ) {
   const palette = splitCellPalette(cell.kind, theme);
-  const availableWidth = Math.max(0, width - prefixWidth);
-  const gutterWidth = Math.min(availableWidth, showLineNumbers ? lineNumberDigits + 3 : 2);
-  const contentWidth = Math.max(0, availableWidth - gutterWidth);
+  const { gutterWidth, contentWidth } = resolveSplitCellGeometry(
+    width,
+    lineNumberDigits,
+    showLineNumbers,
+    prefixWidth,
+  );
   const firstGutterText = showLineNumbers
     ? `${cell.lineNumber ? String(cell.lineNumber).padStart(lineNumberDigits, " ") : " ".repeat(lineNumberDigits)} ${cell.sign}`.padEnd(
         gutterWidth,
@@ -344,9 +352,12 @@ function buildWrappedStackCell(
   theme: AppTheme,
 ) {
   const palette = stackCellPalette(cell.kind, theme);
-  const availableWidth = Math.max(0, width - prefixWidth);
-  const gutterWidth = Math.min(availableWidth, showLineNumbers ? lineNumberDigits * 2 + 5 : 2);
-  const contentWidth = Math.max(0, availableWidth - gutterWidth);
+  const { gutterWidth, contentWidth } = resolveStackCellGeometry(
+    width,
+    lineNumberDigits,
+    showLineNumbers,
+    prefixWidth,
+  );
   const oldNumber = cell.oldLineNumber
     ? String(cell.oldLineNumber).padStart(lineNumberDigits, " ")
     : " ".repeat(lineNumberDigits);
@@ -385,9 +396,12 @@ function renderSplitCell(
 ) {
   const palette = splitCellPalette(cell.kind, theme);
   const prefixWidth = prefix?.text.length ?? 0;
-  const availableWidth = Math.max(0, width - prefixWidth);
-  const gutterWidth = Math.min(availableWidth, showLineNumbers ? lineNumberDigits + 3 : 2);
-  const contentWidth = Math.max(0, availableWidth - gutterWidth);
+  const { gutterWidth, contentWidth } = resolveSplitCellGeometry(
+    width,
+    lineNumberDigits,
+    showLineNumbers,
+    prefixWidth,
+  );
   const gutterText = showLineNumbers
     ? `${cell.lineNumber ? String(cell.lineNumber).padStart(lineNumberDigits, " ") : " ".repeat(lineNumberDigits)} ${cell.sign}`.padEnd(
         gutterWidth,
@@ -433,9 +447,12 @@ function renderStackCell(
 ) {
   const palette = stackCellPalette(cell.kind, theme);
   const prefixWidth = prefix?.text.length ?? 0;
-  const availableWidth = Math.max(0, width - prefixWidth);
-  const gutterWidth = Math.min(availableWidth, showLineNumbers ? lineNumberDigits * 2 + 5 : 2);
-  const contentWidth = Math.max(0, availableWidth - gutterWidth);
+  const { gutterWidth, contentWidth } = resolveStackCellGeometry(
+    width,
+    lineNumberDigits,
+    showLineNumbers,
+    prefixWidth,
+  );
 
   const oldNumber = cell.oldLineNumber
     ? String(cell.oldLineNumber).padStart(lineNumberDigits, " ")
@@ -549,21 +566,6 @@ export function diffMessage(file: DiffFile) {
   return "No textual hunks to render for this file.";
 }
 
-/** Find the widest line-number column needed for this file. */
-export function findMaxLineNumber(file: DiffFile) {
-  let highest = 0;
-
-  for (const hunk of file.metadata.hunks) {
-    highest = Math.max(
-      highest,
-      hunk.deletionStart + hunk.deletionCount,
-      hunk.additionStart + hunk.additionCount,
-    );
-  }
-
-  return Math.max(highest, 1);
-}
-
 /** Render collapsed and hunk-header rows, including the optional AI badge target. */
 function renderHeaderRow(
   row: Extract<DiffRow, { type: "collapsed" | "hunk-header" }>,
@@ -671,10 +673,7 @@ export function measureRenderedRowHeight(
     }
 
     const markerWidth = 1;
-    const separatorWidth = 1;
-    const usableWidth = Math.max(0, width - markerWidth - separatorWidth);
-    const leftWidth = Math.max(0, markerWidth + Math.floor(usableWidth / 2));
-    const rightWidth = Math.max(0, separatorWidth + usableWidth - Math.floor(usableWidth / 2));
+    const { leftWidth, rightWidth } = resolveSplitPaneWidths(width);
     const leftLayout = buildWrappedSplitCell(
       row.left,
       leftWidth,
@@ -749,13 +748,9 @@ function renderRow(
   } else if (row.type === "split-line") {
     const guideOnOldSide = noteGuideSide === "old";
     const guideOnNewSide = noteGuideSide === "new";
-    const markerWidth = 1;
-    const separatorWidth = 1;
 
     // Reserve fixed columns for the diff rails and center separator slot.
-    const usableWidth = Math.max(0, width - markerWidth - separatorWidth);
-    const leftWidth = Math.max(0, markerWidth + Math.floor(usableWidth / 2));
-    const rightWidth = Math.max(0, separatorWidth + usableWidth - Math.floor(usableWidth / 2));
+    const { leftWidth, rightWidth } = resolveSplitPaneWidths(width);
     const rightRenderWidth = Math.max(0, rightWidth - (guideOnNewSide ? 1 : 0));
     const leftPrefix = {
       text: guideOnOldSide ? "│" : marker(),

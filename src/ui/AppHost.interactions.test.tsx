@@ -297,6 +297,10 @@ function firstVisibleAddedLine(frame: string) {
   return frame.match(/line\d{2} = 1\d{2}/)?.[0] ?? null;
 }
 
+function firstVisibleAddedLineNumber(frame: string) {
+  return frame.match(/▌\s*(\d+)\s+\+/)?.[1] ?? null;
+}
+
 describe("App interactions", () => {
   test("keyboard shortcuts toggle notes, line numbers, and hunk metadata", async () => {
     const setup = await testRender(<AppHost bootstrap={createSingleFileBootstrap()} />, {
@@ -583,6 +587,40 @@ describe("App interactions", () => {
 
       expect(frame).toContain("this is a very");
       expect(frame).not.toContain("interaction coverage");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("shift plus mouse wheel does not move the vertical review position", async () => {
+    const setup = await testRender(<AppHost bootstrap={createWrapScrollBootstrap()} />, {
+      width: 92,
+      height: 20,
+    });
+
+    try {
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      const initialTopLine = firstVisibleAddedLineNumber(frame);
+      expect(initialTopLine).toBeTruthy();
+      expect(frame).not.toContain("viewport anchoring");
+
+      for (let index = 0; index < 8; index += 1) {
+        await act(async () => {
+          await setup.mockMouse.scroll(60, 10, "down", { modifiers: { shift: true } });
+        });
+        await flush(setup);
+        frame = setup.captureCharFrame();
+        if (frame.includes("viewport anchoring")) {
+          break;
+        }
+      }
+
+      expect(frame).toContain("viewport anchoring");
+      expect(firstVisibleAddedLineNumber(frame)).toBe(initialTopLine);
     } finally {
       await act(async () => {
         setup.renderer.destroy();

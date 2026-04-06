@@ -5,7 +5,7 @@ import {
 } from "@opentui/core";
 import { useRenderer, useTerminalDimensions } from "@opentui/react";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import type { AppBootstrap, CliInput, DiffFile, LayoutMode } from "../core/types";
+import type { AppBootstrap, CliInput, LayoutMode } from "../core/types";
 import { canReloadInput, computeWatchSignature } from "../core/watch";
 import { HunkHostClient } from "../mcp/client";
 import type { ReloadedSessionResult } from "../mcp/types";
@@ -14,6 +14,11 @@ import { StatusBar } from "./components/chrome/StatusBar";
 import { DiffPane } from "./components/panes/DiffPane";
 import { SidebarPane } from "./components/panes/SidebarPane";
 import { PaneDivider } from "./components/panes/PaneDivider";
+import {
+  findMaxLineNumber,
+  maxFileCodeLineWidth,
+  resolveCodeViewportWidth,
+} from "./diff/codeColumns";
 import { useAppKeyboardShortcuts } from "./hooks/useAppKeyboardShortcuts";
 import { useHunkSessionBridge } from "./hooks/useHunkSessionBridge";
 import { useMenuController } from "./hooks/useMenuController";
@@ -38,23 +43,6 @@ const LazyMenuDropdown = lazy(async () => ({
 /** Clamp a value into an inclusive range. */
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-/** Measure one diff line after the same tab expansion used by the renderer. */
-function renderedCodeLineWidth(line: string | undefined) {
-  return (line ?? "").replace(/\n$/, "").replaceAll("\t", "  ").length;
-}
-
-/** Track the widest code line that could benefit from horizontal reveal. */
-function maxFileCodeLineWidth(file: DiffFile) {
-  const deletionLines = file.metadata.deletionLines ?? [];
-  const additionLines = file.metadata.additionLines ?? [];
-
-  return Math.max(
-    0,
-    ...deletionLines.map(renderedCodeLineWidth),
-    ...additionLines.map(renderedCodeLineWidth),
-  );
 }
 
 /** Preserve the active app view settings when rebuilding the current input. */
@@ -188,6 +176,26 @@ export function App({
   const diffPaneWidth = renderSidebar
     ? Math.max(DIFF_MIN_WIDTH, availableCenterWidth - clampedSidebarWidth)
     : Math.max(0, availableCenterWidth);
+  const diffContentWidth = Math.max(12, diffPaneWidth - 2);
+  const maxVisibleLineNumber = useMemo(
+    () =>
+      filteredFiles.reduce(
+        (maxLineNumber, file) => Math.max(maxLineNumber, findMaxLineNumber(file)),
+        1,
+      ),
+    [filteredFiles],
+  );
+  const maxLineNumberDigits = String(maxVisibleLineNumber).length;
+  const codeViewportWidth = useMemo(
+    () =>
+      resolveCodeViewportWidth(
+        resolvedLayout,
+        diffContentWidth,
+        maxLineNumberDigits,
+        showLineNumbers,
+      ),
+    [diffContentWidth, maxLineNumberDigits, resolvedLayout, showLineNumbers],
+  );
   const isResizingSidebar = resizeDragOriginX !== null && resizeStartWidth !== null;
   const dividerHitLeft = Math.max(
     1,
@@ -246,9 +254,9 @@ export function App({
         filteredFiles.reduce(
           (maxWidth, file) => Math.max(maxWidth, maxFileCodeLineWidth(file)),
           0,
-        ) - 1,
+        ) - codeViewportWidth,
       ),
-    [filteredFiles],
+    [codeViewportWidth, filteredFiles],
   );
 
   useEffect(() => {
@@ -609,7 +617,6 @@ export function App({
   );
   const topTitle = `${bootstrap.changeset.title}  +${totalAdditions}  -${totalDeletions}`;
   const sidebarTextWidth = Math.max(8, clampedSidebarWidth - 2);
-  const diffContentWidth = Math.max(12, diffPaneWidth - 2);
   const diffHeaderStatsWidth = Math.min(24, Math.max(16, Math.floor(diffContentWidth / 3)));
   const diffHeaderLabelWidth = Math.max(8, diffContentWidth - diffHeaderStatsWidth - 1);
   const diffSeparatorWidth = Math.max(4, diffContentWidth - 2);
