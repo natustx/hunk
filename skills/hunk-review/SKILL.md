@@ -106,7 +106,6 @@ hunk session comment clear --repo . --yes [--file README.md]
 - Prefer `--hunk <n>` when you want to annotate the whole diff hunk instead of picking a single line manually
 - `comment apply` reads a JSON batch from stdin, validates the full batch before mutating the live session, and defaults to keeping the current focus; pass `--reveal-last` if you want the last applied note revealed
 - `comment add` reveals the note by default; pass `--no-reveal` to keep the current focus
-- If the running Hunk build does not support `comment apply` yet, fall back to repeated `comment add` commands
 - `comment list` and `comment clear` accept optional `--file`
 - Quote `--summary` and `--rationale` defensively in the shell
 
