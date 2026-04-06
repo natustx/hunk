@@ -61,7 +61,6 @@ CLI input
   - `test/session/` for daemon/session integration and end-to-end flows.
   - `test/pty/` for PTY-backed live UI integration tests.
   - `test/smoke/` for opt-in terminal transcript smoke coverage.
-- Prefer intent-first test filenames (`entrypoint`, `daemon`, `broker`, `ui`, `tty`) over names that repeat the folder or leak the harness.
 
 ## code comments
 
