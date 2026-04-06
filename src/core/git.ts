@@ -316,6 +316,8 @@ function isReviewableUntrackedPath(repoRoot: string, filePath: string) {
   try {
     pathInfo = fs.lstatSync(absolutePath);
   } catch {
+    // If the path disappeared after `git status`, let the downstream Git diff
+    // surface the same error path users would have seen before this filter.
     return true;
   }
 
@@ -332,6 +334,7 @@ function isReviewableUntrackedPath(repoRoot: string, filePath: string) {
     // cannot synthesize a parseable file patch for them.
     return !fs.statSync(absolutePath).isDirectory();
   } catch {
+    // Broken symlinks still diff as reviewable path entries, so keep them.
     return true;
   }
 }
