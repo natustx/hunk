@@ -24,6 +24,7 @@ import {
   shouldRenderInStreamFileHeader,
 } from "../../lib/fileSectionLayout";
 import { diffHunkId, diffSectionId } from "../../lib/ids";
+import { findViewportCenteredHunkTarget } from "../../lib/viewportSelection";
 import type { AppTheme } from "../../themes";
 import { DiffSection } from "./DiffSection";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
@@ -148,6 +149,7 @@ export function DiffPane({
   width,
   onOpenAgentNotesAtHunk,
   onSelectFile,
+  onViewportCenteredHunkChange,
 }: {
   diffContentWidth: number;
   files: DiffFile[];
@@ -170,6 +172,7 @@ export function DiffPane({
   width: number;
   onOpenAgentNotesAtHunk: (fileId: string, hunkIndex: number) => void;
   onSelectFile: (fileId: string) => void;
+  onViewportCenteredHunkChange?: (fileId: string, hunkIndex: number) => void;
 }) {
   const renderer = useRenderer();
   const [prefetchAnchorKey, setPrefetchAnchorKey] = useState<string | null>(null);
@@ -250,6 +253,27 @@ export function DiffPane({
   const previousSelectedFileTopAlignRequestIdRef = useRef(selectedFileTopAlignRequestId);
   const suppressNextSelectionAutoScrollRef = useRef(false);
   const pendingFileTopAlignFileIdRef = useRef<string | null>(null);
+  const mouseScrollSelectionSyncActiveRef = useRef(false);
+  const mouseScrollSelectionSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const armMouseScrollSelectionSync = useCallback(() => {
+    mouseScrollSelectionSyncActiveRef.current = true;
+    if (mouseScrollSelectionSyncTimeoutRef.current) {
+      clearTimeout(mouseScrollSelectionSyncTimeoutRef.current);
+    }
+    mouseScrollSelectionSyncTimeoutRef.current = setTimeout(() => {
+      mouseScrollSelectionSyncActiveRef.current = false;
+      mouseScrollSelectionSyncTimeoutRef.current = null;
+    }, 120);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mouseScrollSelectionSyncTimeoutRef.current) {
+        clearTimeout(mouseScrollSelectionSyncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const scrollBox = scrollRef.current;
@@ -395,6 +419,47 @@ export function DiffPane({
   // Read the live scroll box position during render so pinned-header ownership flips
   // immediately after imperative scrolls instead of waiting for the polled viewport snapshot.
   const effectiveScrollTop = scrollRef.current?.scrollTop ?? scrollViewport.top;
+
+  useLayoutEffect(() => {
+    if (
+      !onViewportCenteredHunkChange ||
+      !mouseScrollSelectionSyncActiveRef.current ||
+      files.length === 0 ||
+      scrollViewport.height <= 0
+    ) {
+      return;
+    }
+
+    const centeredTarget = findViewportCenteredHunkTarget({
+      files,
+      fileSectionLayouts,
+      sectionGeometry,
+      scrollTop: scrollViewport.top,
+      viewportHeight: scrollViewport.height,
+    });
+    if (!centeredTarget) {
+      return;
+    }
+
+    if (
+      centeredTarget.fileId === selectedFileId &&
+      centeredTarget.hunkIndex === selectedHunkIndex
+    ) {
+      return;
+    }
+
+    suppressNextSelectionAutoScrollRef.current = true;
+    onViewportCenteredHunkChange(centeredTarget.fileId, centeredTarget.hunkIndex);
+  }, [
+    fileSectionLayouts,
+    files,
+    onViewportCenteredHunkChange,
+    scrollViewport.height,
+    scrollViewport.top,
+    sectionGeometry,
+    selectedFileId,
+    selectedHunkIndex,
+  ]);
 
   const pinnedHeaderFile = useMemo(() => {
     if (files.length === 0) {
@@ -822,6 +887,7 @@ export function DiffPane({
               scrollY={true}
               viewportCulling={true}
               focused={pagerMode}
+              onMouseScroll={armMouseScrollSelectionSync}
               rootOptions={{ backgroundColor: theme.panel }}
               wrapperOptions={{ backgroundColor: theme.panel }}
               viewportOptions={{ backgroundColor: theme.panel }}

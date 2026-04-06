@@ -657,6 +657,7 @@ export function App({
           width={diffPaneWidth}
           onOpenAgentNotesAtHunk={openAgentNotesAtHunk}
           onSelectFile={jumpToFile}
+          onViewportCenteredHunkChange={review.selectHunk}
         />
       </box>
 
