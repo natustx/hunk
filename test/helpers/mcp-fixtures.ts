@@ -80,7 +80,6 @@ export function createTestSessionRegistration(
     title: "repo working tree",
     sourceLabel: "/repo",
     launchedAt: "2026-03-22T00:00:00.000Z",
-    reviewFiles,
     ...overrides,
     reviewFiles,
   };
@@ -99,9 +98,6 @@ export function createTestListedSession(overrides: Partial<ListedSession> = {}):
     title: "repo working tree",
     sourceLabel: "/repo",
     launchedAt: "2026-03-22T00:00:00.000Z",
-    fileCount: overrides.fileCount ?? files.length,
-    files,
-    snapshot,
     ...overrides,
     fileCount: overrides.fileCount ?? files.length,
     files,
@@ -149,14 +145,14 @@ export function createTestSelectedSessionContext(
   };
 }
 
-export function createTestSessionReview(
-  overrides: Partial<SessionReview> = {},
-): SessionReview {
+export function createTestSessionReview(overrides: Partial<SessionReview> = {}): SessionReview {
   const files = overrides.files ?? [createTestSessionReviewFile()];
   const selectedFile =
     overrides.selectedFile === undefined ? (files[0] ?? null) : overrides.selectedFile;
   const selectedHunk =
-    overrides.selectedHunk === undefined ? (selectedFile?.hunks[0] ?? null) : overrides.selectedHunk;
+    overrides.selectedHunk === undefined
+      ? (selectedFile?.hunks[0] ?? null)
+      : overrides.selectedHunk;
 
   return {
     sessionId: "session-1",
@@ -164,11 +160,8 @@ export function createTestSessionReview(
     sourceLabel: "/repo",
     repoRoot: "/repo",
     inputKind: "git",
-    selectedFile,
-    selectedHunk,
     showAgentNotes: false,
     liveCommentCount: 0,
-    files,
     ...overrides,
     selectedFile,
     selectedHunk,
