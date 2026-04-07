@@ -158,12 +158,9 @@ const RESERVED_PIERRE_TOKEN_COLORS = {
   },
 } as const;
 // After style parsing, token colors still need one normalization step so syntax hues never
-// collide with diff-semantic add/remove colors. Cache that remap per appearance because the
-// same raw token colors recur constantly.
-const normalizedColorCache = {
-  dark: new Map<string, string>(),
-  light: new Map<string, string>(),
-};
+// collide with diff-semantic add/remove colors. Cache that remap per theme because themes that
+// share an appearance can still use different syntax palettes.
+const normalizedColorCache = new Map<string, Map<string, string>>();
 // The expensive part after highlighting is walking Pierre's HAST line tree and flattening it
 // into terminal spans. The same highlighted line objects are reused when files remount or when
 // we build both split and stack rows, so memoize flattened spans by line node + theme/background.
@@ -175,7 +172,13 @@ function normalizeHighlightedColor(color: string | undefined, theme: AppTheme) {
     return color;
   }
 
-  const cached = normalizedColorCache[theme.appearance].get(color);
+  let cacheForTheme = normalizedColorCache.get(theme.id);
+  if (!cacheForTheme) {
+    cacheForTheme = new Map<string, string>();
+    normalizedColorCache.set(theme.id, cacheForTheme);
+  }
+
+  const cached = cacheForTheme.get(color);
   if (cached) {
     return cached;
   }
@@ -186,7 +189,7 @@ function normalizeHighlightedColor(color: string | undefined, theme: AppTheme) {
       normalized as keyof (typeof RESERVED_PIERRE_TOKEN_COLORS)[typeof theme.appearance]
     ];
   const resolvedColor = reserved ? theme.syntaxColors[reserved] : color;
-  normalizedColorCache[theme.appearance].set(color, resolvedColor);
+  cacheForTheme.set(color, resolvedColor);
   return resolvedColor;
 }
 
