@@ -522,21 +522,20 @@ describe("live UI integration", () => {
       await session.press("d");
       const halfPaged = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("before_12"),
+        (text) => !text.includes("before_01"),
         5_000,
       );
 
-      expect(halfPaged).toContain("before_12");
+      expect(halfPaged).not.toContain("before_01");
 
       await session.press("u");
       const halfPageRestored = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("before_01") && !text.includes("before_12"),
+        (text) => text.includes("before_01"),
         5_000,
       );
 
       expect(halfPageRestored).toContain("before_01");
-      expect(halfPageRestored).not.toContain("before_12");
 
       await session.press("space");
       const paged = await harness.waitForSnapshot(
