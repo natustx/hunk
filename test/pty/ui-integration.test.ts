@@ -410,10 +410,20 @@ describe("live UI integration", () => {
       expect(initial).toContain("alphaOnly = true");
       expect(initial).toContain("betaValue = 2");
 
-      await session.type("/delta");
+      await session.type("/");
+      await harness.waitForSnapshot(
+        session,
+        (text) => text.includes("filter: type to filter files"),
+        5_000,
+      );
+
+      await session.type("delta");
       const filtered = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("deltaOnly = true") && !text.includes("alphaOnly = true"),
+        (text) =>
+          text.includes("filter: delta") &&
+          text.includes("deltaOnly = true") &&
+          !text.includes("alphaOnly = true"),
         5_000,
       );
 
