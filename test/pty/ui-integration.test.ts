@@ -446,7 +446,7 @@ describe("live UI integration", () => {
       expect(cleared).toContain("filter: type to filter files");
       expect(cleared).not.toContain("filter: delta");
 
-      await session.waitIdle({ timeout: 100 });
+      await session.waitIdle({ timeout: 500 });
       await session.press("escape");
       const leftFilter = await harness.waitForSnapshot(
         session,
@@ -605,7 +605,7 @@ describe("live UI integration", () => {
       expect(help).toContain("move line-by-line");
       expect(help).toContain("toggle AI notes");
 
-      await session.waitIdle({ timeout: 100 });
+      await session.waitIdle({ timeout: 500 });
       await session.press("escape");
       const closed = await harness.waitForSnapshot(
         session,
@@ -687,7 +687,7 @@ describe("live UI integration", () => {
 
       expect(fileMenu).toContain("Reload");
 
-      await session.waitIdle({ timeout: 100 });
+      await session.waitIdle({ timeout: 500 });
       await session.press("escape");
       const closed = await harness.waitForSnapshot(
         session,

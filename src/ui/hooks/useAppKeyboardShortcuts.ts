@@ -23,13 +23,10 @@ export interface UseAppKeyboardShortcutsOptions {
   activeMenuId: MenuId | null;
   activateCurrentMenuItem: () => void;
   canRefreshCurrentInput: boolean;
-  clearFilter: () => void;
   closeHelp: () => void;
   closeMenu: () => void;
   cycleTheme: () => void;
-  filter: string;
   focusArea: FocusArea;
-  focusFiles: () => void;
   focusFilter: () => void;
   moveToAnnotatedHunk: (delta: number) => void;
   moveToHunk: (delta: number) => void;
@@ -57,13 +54,10 @@ export function useAppKeyboardShortcuts({
   activeMenuId,
   activateCurrentMenuItem,
   canRefreshCurrentInput,
-  clearFilter,
   closeHelp,
   closeMenu,
   cycleTheme,
-  filter,
   focusArea,
-  focusFiles,
   focusFilter,
   moveToAnnotatedHunk,
   moveToHunk,
@@ -86,13 +80,11 @@ export function useAppKeyboardShortcuts({
   triggerRefreshCurrentInput,
 }: UseAppKeyboardShortcutsOptions) {
   const activeMenuIdRef = useRef(activeMenuId);
-  const filterRef = useRef(filter);
   const focusAreaRef = useRef(focusArea);
   const pagerModeRef = useRef(pagerMode);
   const showHelpRef = useRef(showHelp);
 
   activeMenuIdRef.current = activeMenuId;
-  filterRef.current = filter;
   focusAreaRef.current = focusArea;
   pagerModeRef.current = pagerMode;
   showHelpRef.current = showHelp;
@@ -233,22 +225,12 @@ export function useAppKeyboardShortcuts({
       return false;
     }
 
-    if (isEscapeKey(key)) {
-      if (filterRef.current.length > 0) {
-        clearFilter();
-        return true;
-      }
-
-      focusFiles();
-      return true;
-    }
-
     if (key.name === "tab") {
       toggleFocusArea();
       return true;
     }
 
-    // Let the focused input own filter text editing while the app owns mode switches.
+    // Let the focused input own filter editing and escape handling.
     return true;
   };
 
