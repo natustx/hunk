@@ -607,12 +607,13 @@ describe("live UI integration", () => {
       await session.press("escape");
       const closed = await harness.waitForSnapshot(
         session,
-        (text) => !text.includes("Keyboard help") && text.includes("alpha.ts"),
+        (text) =>
+          !text.includes("Keyboard help") && text.includes("View  Navigate  Theme  Agent  Help"),
         5_000,
       );
 
       expect(closed).not.toContain("Keyboard help");
-      expect(closed).toContain("alpha.ts");
+      expect(closed).toContain("View  Navigate  Theme  Agent  Help");
     } finally {
       session.close();
     }
@@ -687,12 +688,14 @@ describe("live UI integration", () => {
       await session.press("escape");
       const closed = await harness.waitForSnapshot(
         session,
-        (text) => !text.includes("Toggle files/filter focus") && text.includes("alpha.ts"),
+        (text) =>
+          !text.includes("Toggle files/filter focus") &&
+          text.includes("View  Navigate  Theme  Agent  Help"),
         5_000,
       );
 
       expect(closed).not.toContain("Toggle files/filter focus");
-      expect(closed).toContain("alpha.ts");
+      expect(closed).toContain("View  Navigate  Theme  Agent  Help");
 
       await session.press("f10");
       await harness.waitForSnapshot(
