@@ -230,6 +230,10 @@ function parseSessionCommentApplyPayload(raw: string): SessionCommentApplyItemIn
     throw new Error("Session comment apply expected a top-level `comments` array.");
   }
 
+  if (value.comments.length === 0) {
+    throw new Error("Session comment apply expected at least one comment.");
+  }
+
   return value.comments.map((comment, index) => {
     const itemNumber = index + 1;
     if (!comment || typeof comment !== "object") {
@@ -249,10 +253,8 @@ function parseSessionCommentApplyPayload(raw: string): SessionCommentApplyItemIn
 
     const hunk = parsePositiveJsonInt(item.hunk, { field: "hunk", itemNumber });
     const hunkNumber = parsePositiveJsonInt(item.hunkNumber, { field: "hunkNumber", itemNumber });
-    if (hunk !== undefined && hunkNumber !== undefined && hunk !== hunkNumber) {
-      throw new Error(
-        `Comment ${itemNumber} must not disagree between \`hunk\` and \`hunkNumber\`.`,
-      );
+    if (hunk !== undefined && hunkNumber !== undefined) {
+      throw new Error(`Comment ${itemNumber} must not specify both \`hunk\` and \`hunkNumber\`.`);
     }
 
     const oldLine = parsePositiveJsonInt(item.oldLine, { field: "oldLine", itemNumber });
