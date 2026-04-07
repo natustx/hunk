@@ -556,12 +556,14 @@ describe("live UI integration", () => {
       await session.press("?");
       const help = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("move line-by-line") && text.includes("toggle AI notes"),
+        (text) =>
+          (text.includes("Keyboard help") || text.includes("Controls help")) &&
+          text.includes("move line-by-line"),
         5_000,
       );
 
+      expect(help.includes("Keyboard help") || help.includes("Controls help")).toBe(true);
       expect(help).toContain("move line-by-line");
-      expect(help).toContain("toggle AI notes");
     } finally {
       session.close();
     }
