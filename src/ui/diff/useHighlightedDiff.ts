@@ -19,16 +19,43 @@ function enforceCacheLimit() {
   }
 }
 
+/** Summarize rendered diff lines without serializing whole arrays into the cache key. */
+function lineSetFingerprint(lines: string[] | undefined) {
+  let totalChars = 0;
+  let hash = 2166136261;
+
+  for (const line of lines ?? []) {
+    totalChars += line.length;
+
+    for (let index = 0; index < line.length; index += 1) {
+      hash ^= line.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+
+    hash ^= 10;
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `${lines?.length ?? 0}:${totalChars}:${(hash >>> 0).toString(36)}`;
+}
+
 /** Build a fallback fingerprint from parsed metadata when raw patch text is unavailable. */
 function metadataFingerprint(file: DiffFile) {
-  return JSON.stringify({
-    additionLines: file.metadata.additionLines,
-    deletionLines: file.metadata.deletionLines,
-    hunks: file.metadata.hunks,
-    name: file.metadata.name,
-    prevName: file.metadata.prevName,
-    type: file.metadata.type,
-  });
+  const hunkSummary = file.metadata.hunks
+    .map(
+      (hunk) =>
+        `${hunk.hunkSpecs ?? ""}:${hunk.deletionStart}:${hunk.deletionCount}:${hunk.additionStart}:${hunk.additionCount}:${hunk.hunkContent.length}`,
+    )
+    .join("|");
+
+  return [
+    file.metadata.name,
+    file.metadata.prevName ?? "",
+    file.metadata.type,
+    lineSetFingerprint(file.metadata.deletionLines),
+    lineSetFingerprint(file.metadata.additionLines),
+    hunkSummary,
+  ].join(":");
 }
 
 /** Content fingerprint from the diff patch. Changes whenever the underlying diff

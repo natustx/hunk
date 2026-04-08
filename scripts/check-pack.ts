@@ -59,7 +59,15 @@ for (const path of requiredPaths) {
   }
 }
 
-const forbiddenPrefixes = [".github/", "src/", "test/", "scripts/", "tmp/"];
+const forbiddenPrefixes = [
+  ".github/",
+  "src/",
+  "test/",
+  "scripts/",
+  "tmp/",
+  "dist/npm/core/",
+  "dist/npm/ui/",
+];
 const forbiddenPaths = ["AGENTS.md", "bun.lock"];
 
 for (const file of pack.files) {

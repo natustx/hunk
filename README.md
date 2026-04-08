@@ -101,10 +101,10 @@ Hunk also publishes a reusable OpenTUI React diff component powered by the same 
 
 Runnable source examples live in [`examples/7-opentui-component`](examples/7-opentui-component/README.md).
 
-Import it from `hunkdiff` or `hunkdiff/opentui`:
+Import it from `hunkdiff/opentui`:
 
 ```tsx
-import { HunkDiffView, parseDiffFromFile } from "hunkdiff";
+import { HunkDiffView, parseDiffFromFile } from "hunkdiff/opentui";
 
 const metadata = parseDiffFromFile(
   {

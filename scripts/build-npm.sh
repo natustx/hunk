@@ -3,8 +3,10 @@ set -Eeuo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 outdir="${repo_root}/dist/npm"
+types_outdir="${repo_root}/dist/npm-types"
 
 rm -rf "${outdir}"
+rm -rf "${types_outdir}"
 mkdir -p "${outdir}/opentui"
 
 BUN_TMPDIR="${repo_root}/.bun-tmp" \
@@ -34,6 +36,9 @@ BUN_INSTALL="${repo_root}/.bun-install" \
     --entry-naming index.js
 
 bun x tsc -p "${repo_root}/tsconfig.opentui.json"
+
+cp "${types_outdir}/opentui/"*.d.ts "${outdir}/opentui/"
+rm -rf "${types_outdir}"
 
 printf 'Built %s\n' "${outdir}/main.js"
 printf 'Built %s\n' "${outdir}/opentui/index.js"
