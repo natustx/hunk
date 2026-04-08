@@ -192,6 +192,45 @@ describe("Hunk MCP daemon state", () => {
     ]);
   });
 
+  test("ignores incompatible session registrations so listings stay usable after upgrades", () => {
+    const state = new HunkDaemonState();
+    const socket = {
+      send() {},
+    };
+
+    const accepted = state.registerSession(
+      socket,
+      {
+        ...createRegistration(),
+        registrationVersion: 0,
+      },
+      createSnapshot(),
+    );
+
+    expect(accepted).toBe(false);
+    expect(state.listSessions()).toEqual([]);
+  });
+
+  test("ignores incompatible snapshot updates and keeps the last valid selection", () => {
+    const state = new HunkDaemonState();
+    const socket = {
+      send() {},
+    };
+
+    state.registerSession(socket, createRegistration(), createSnapshot());
+
+    const accepted = state.updateSnapshot("session-1", {
+      selectedHunkIndex: "oops",
+    });
+
+    expect(accepted).toBe(false);
+    expect(state.getSelectedContext({ sessionId: "session-1" })).toEqual(
+      expect.objectContaining({
+        selectedHunk: expect.objectContaining({ index: 0 }),
+      }),
+    );
+  });
+
   test("routes a comment command to the live session and resolves the async result", async () => {
     const state = new HunkDaemonState();
     const sent: string[] = [];

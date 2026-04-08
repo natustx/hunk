@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { parseSessionRegistration, parseSessionSnapshot } from "./sessionWire";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -258,11 +259,23 @@ export class HunkDaemonState {
     return this.pendingCommands.size;
   }
 
-  registerSession(
-    socket: DaemonSessionSocket,
-    registration: HunkSessionRegistration,
-    snapshot: HunkSessionSnapshot,
-  ) {
+  registerSession(socket: DaemonSessionSocket, registrationInput: unknown, snapshotInput: unknown) {
+    const registration = parseSessionRegistration(registrationInput);
+    const snapshot = parseSessionSnapshot(snapshotInput);
+    if (!registration || !snapshot) {
+      const previousSessionId = this.sessionIdsBySocket.get(socket);
+      if (previousSessionId) {
+        // Drop any stale session already tied to this socket so an incompatible replacement
+        // payload cannot leave old review data behind after an upgrade or reload.
+        this.removeSession(
+          previousSessionId,
+          new Error("The Hunk session sent an incompatible registration payload."),
+        );
+      }
+
+      return false;
+    }
+
     const previousSessionId = this.sessionIdsBySocket.get(socket);
     if (previousSessionId && previousSessionId !== registration.sessionId) {
       this.unregisterSocket(socket);
@@ -286,12 +299,18 @@ export class HunkDaemonState {
       lastSeenAt: now,
     });
     this.sessionIdsBySocket.set(socket, registration.sessionId);
+    return true;
   }
 
-  updateSnapshot(sessionId: string, snapshot: HunkSessionSnapshot) {
+  updateSnapshot(sessionId: string, snapshotInput: unknown) {
     const entry = this.sessions.get(sessionId);
     if (!entry) {
-      return;
+      return false;
+    }
+
+    const snapshot = parseSessionSnapshot(snapshotInput);
+    if (!snapshot) {
+      return false;
     }
 
     this.sessions.set(sessionId, {
@@ -299,6 +318,7 @@ export class HunkDaemonState {
       snapshot,
       lastSeenAt: new Date().toISOString(),
     });
+    return true;
   }
 
   markSessionSeen(sessionId: string) {
@@ -319,7 +339,7 @@ export class HunkDaemonState {
       return;
     }
 
-    this.removeSession(sessionId, "The targeted Hunk session disconnected.");
+    this.removeSession(sessionId, new Error("The targeted Hunk session disconnected."));
   }
 
   pruneStaleSessions({ ttlMs, now = Date.now() }: { ttlMs: number; now?: number }) {
@@ -334,7 +354,7 @@ export class HunkDaemonState {
 
       this.removeSession(
         sessionId,
-        "The targeted Hunk session became stale and was removed from the MCP daemon.",
+        new Error("The targeted Hunk session became stale and was removed from the MCP daemon."),
       );
       removed += 1;
     }
@@ -497,7 +517,7 @@ export class HunkDaemonState {
     });
   }
 
-  private removeSession(sessionId: string, reason: string) {
+  private removeSession(sessionId: string, error: Error) {
     const entry = this.sessions.get(sessionId);
     if (!entry) {
       return;
@@ -508,7 +528,7 @@ export class HunkDaemonState {
       this.sessionIdsBySocket.delete(entry.socket);
     }
 
-    this.rejectPendingCommandsForSession(sessionId, new Error(reason));
+    this.rejectPendingCommandsForSession(sessionId, error);
   }
 
   private rejectPendingCommandsForSession(sessionId: string, error: Error) {
