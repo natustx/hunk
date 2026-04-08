@@ -383,7 +383,13 @@ export function serveHunkMcpServer(options: ServeHunkMcpServerOptions = {}): Run
                 return;
               }
 
-              if (!state.updateSnapshot(parsed.sessionId, parsed.snapshot)) {
+              const updateResult = state.updateSnapshot(parsed.sessionId, parsed.snapshot);
+              if (updateResult === "not-found") {
+                socket.close(1008, "Hunk session not registered with daemon.");
+                return;
+              }
+
+              if (updateResult === "invalid") {
                 socket.close(1008, "Incompatible Hunk session snapshot.");
                 return;
               }

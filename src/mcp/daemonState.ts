@@ -44,6 +44,8 @@ interface SessionEntry {
   lastSeenAt: string;
 }
 
+export type UpdateSnapshotResult = "updated" | "invalid" | "not-found";
+
 export interface SessionTargetSelector {
   sessionId?: string;
   sessionPath?: string;
@@ -302,15 +304,15 @@ export class HunkDaemonState {
     return true;
   }
 
-  updateSnapshot(sessionId: string, snapshotInput: unknown) {
+  updateSnapshot(sessionId: string, snapshotInput: unknown): UpdateSnapshotResult {
     const entry = this.sessions.get(sessionId);
     if (!entry) {
-      return false;
+      return "not-found";
     }
 
     const snapshot = parseSessionSnapshot(snapshotInput);
     if (!snapshot) {
-      return false;
+      return "invalid";
     }
 
     this.sessions.set(sessionId, {
@@ -318,7 +320,7 @@ export class HunkDaemonState {
       snapshot,
       lastSeenAt: new Date().toISOString(),
     });
-    return true;
+    return "updated";
   }
 
   markSessionSeen(sessionId: string) {

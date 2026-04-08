@@ -275,8 +275,6 @@ export function parseSessionSnapshot(value: unknown): HunkSessionSnapshot | null
   const liveComments = record.liveComments
     .map(parseSessionLiveCommentSummary)
     .filter((comment): comment is SessionLiveCommentSummary => comment !== null);
-  const liveCommentCount = parseNonNegativeInt(record.liveCommentCount);
-
   return {
     selectedFileId: parseOptionalString(record.selectedFileId),
     selectedFilePath: parseOptionalString(record.selectedFilePath),
@@ -284,8 +282,8 @@ export function parseSessionSnapshot(value: unknown): HunkSessionSnapshot | null
     selectedHunkOldRange: parseOptionalRange(record.selectedHunkOldRange),
     selectedHunkNewRange: parseOptionalRange(record.selectedHunkNewRange),
     showAgentNotes,
-    // Keep the explicit count when it is sane, but never under-report validated comments.
-    liveCommentCount: Math.max(liveCommentCount ?? 0, liveComments.length),
+    // Count only the validated summaries we actually keep so badges and lists stay consistent.
+    liveCommentCount: liveComments.length,
     liveComments,
     updatedAt,
   };

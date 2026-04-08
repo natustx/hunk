@@ -211,7 +211,7 @@ describe("Hunk MCP daemon state", () => {
     expect(state.listSessions()).toEqual([]);
   });
 
-  test("ignores incompatible snapshot updates and keeps the last valid selection", () => {
+  test("reports invalid snapshot updates without replacing the last valid selection", () => {
     const state = new HunkDaemonState();
     const socket = {
       send() {},
@@ -219,16 +219,26 @@ describe("Hunk MCP daemon state", () => {
 
     state.registerSession(socket, createRegistration(), createSnapshot());
 
-    const accepted = state.updateSnapshot("session-1", {
+    const result = state.updateSnapshot("session-1", {
       selectedHunkIndex: "oops",
     });
 
-    expect(accepted).toBe(false);
+    expect(result).toBe("invalid");
     expect(state.getSelectedContext({ sessionId: "session-1" })).toEqual(
       expect.objectContaining({
         selectedHunk: expect.objectContaining({ index: 0 }),
       }),
     );
+  });
+
+  test("reports missing sessions separately from invalid snapshot payloads", () => {
+    const state = new HunkDaemonState();
+
+    expect(
+      state.updateSnapshot("missing-session", {
+        selectedHunkIndex: 0,
+      }),
+    ).toBe("not-found");
   });
 
   test("routes a comment command to the live session and resolves the async result", async () => {
