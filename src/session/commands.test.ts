@@ -273,6 +273,92 @@ describe("session command compatibility checks", () => {
     }
   });
 
+  test("refreshes a stale daemon before running comment-add", async () => {
+    const selector: SessionSelectorInput = { sessionId: "session-1" };
+    const restartCalls: Array<{ action: string; selector?: SessionSelectorInput }> = [];
+    const createdClients: string[] = [];
+    const notices: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      notices.push(args.map((value) => String(value)).join(" "));
+    };
+
+    const clients = [
+      createClient({
+        getCapabilities: async () => {
+          createdClients.push("stale-capabilities");
+          return null;
+        },
+      }),
+      createClient({
+        addComment: async (input) => {
+          createdClients.push("fresh-comment-add");
+          expect(input.selector).toEqual(selector);
+          expect(input.filePath).toBe("README.md");
+          expect(input.side).toBe("new");
+          expect(input.line).toBe(2);
+          expect(input.summary).toBe("Review note");
+          return {
+            commentId: "comment-1",
+            fileId: "file-1",
+            filePath: "README.md",
+            hunkIndex: 0,
+            side: "new",
+            line: 2,
+          };
+        },
+      }),
+    ];
+
+    try {
+      setSessionCommandTestHooks({
+        createClient: () => {
+          const client = clients.shift();
+          if (!client) {
+            throw new Error("No fake session client remaining.");
+          }
+
+          return client;
+        },
+        resolveDaemonAvailability: async () => true,
+        restartDaemonForMissingAction: async (action, receivedSelector) => {
+          restartCalls.push({ action, selector: receivedSelector });
+        },
+      });
+
+      const output = await runSessionCommand({
+        kind: "session",
+        action: "comment-add",
+        selector,
+        filePath: "README.md",
+        side: "new",
+        line: 2,
+        summary: "Review note",
+        reveal: false,
+        output: "json",
+      } satisfies SessionCommandInput);
+
+      expect(JSON.parse(output)).toMatchObject({
+        result: {
+          commentId: "comment-1",
+          filePath: "README.md",
+          side: "new",
+          line: 2,
+        },
+      });
+      expect(restartCalls).toEqual([
+        {
+          action: "comment-add",
+          selector,
+        },
+      ]);
+      expect(createdClients).toEqual(["stale-capabilities", "fresh-comment-add"]);
+      expect(notices).toContain(HUNK_DAEMON_UPGRADE_RESTART_NOTICE);
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
   test("runs review commands through the daemon without raw patch text by default", async () => {
     setSessionCommandTestHooks({
       createClient: () =>
