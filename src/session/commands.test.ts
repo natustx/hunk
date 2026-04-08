@@ -14,7 +14,7 @@ import {
   type HunkDaemonCliClient,
 } from "./commands";
 import { HUNK_DAEMON_UPGRADE_RESTART_NOTICE } from "./capabilities";
-import { HUNK_SESSION_API_VERSION } from "./protocol";
+import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "./protocol";
 
 function createTestListedSession(sessionId: string) {
   return buildTestListedSession({
@@ -58,6 +58,7 @@ function createClient(overrides: Partial<HunkDaemonCliClient>): HunkDaemonCliCli
   return {
     getCapabilities: async () => ({
       version: HUNK_SESSION_API_VERSION,
+      daemonVersion: HUNK_SESSION_DAEMON_VERSION,
       actions: [
         "list",
         "get",
@@ -215,7 +216,11 @@ describe("session command compatibility checks", () => {
       createClient({
         getCapabilities: async () => {
           createdClients.push("stale-capabilities");
-          return { version: HUNK_SESSION_API_VERSION - 1, actions: ["list"] };
+          return {
+            version: HUNK_SESSION_API_VERSION - 1,
+            daemonVersion: HUNK_SESSION_DAEMON_VERSION,
+            actions: ["list"],
+          };
         },
       }),
       createClient({
@@ -674,6 +679,7 @@ describe("session command compatibility checks", () => {
         createClient({
           getCapabilities: async () => ({
             version: HUNK_SESSION_API_VERSION,
+            daemonVersion: HUNK_SESSION_DAEMON_VERSION,
             actions: [
               "list",
               "get",
