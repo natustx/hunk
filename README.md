@@ -89,12 +89,6 @@ Hunk is optimized for reviewing a full changeset interactively.
 
 ## Advanced
 
-### OpenTUI component
-
-Hunk also publishes `HunkDiffView` from `hunkdiff/opentui` for embedding the same diff renderer in your own OpenTUI app.
-
-See [docs/opentui-component.md](docs/opentui-component.md) for install, API, and runnable examples.
-
 ### Config
 
 You can persist preferences to a config file:
@@ -214,6 +208,12 @@ Use `--agent-context` to attach agent-written comments or rationale from a JSON 
 hunk diff --agent-context notes.json
 hunk patch change.patch --agent-context notes.json
 ```
+
+### OpenTUI component
+
+Hunk also publishes `HunkDiffView` from `hunkdiff/opentui` for embedding the same diff renderer in your own OpenTUI app.
+
+See [docs/opentui-component.md](docs/opentui-component.md) for install, API, and runnable examples.
 
 ## Examples
 
