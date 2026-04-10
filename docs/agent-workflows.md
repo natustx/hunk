@@ -8,7 +8,7 @@ Use Hunk with agents in two ways:
 ## Recommended workflow: steer a live Hunk window
 
 1. Open Hunk in one terminal with a normal review command such as `hunk diff` or `hunk show`.
-2. Load the Hunk review skill: [`../skills/hunk-review/SKILL.md`](../skills/hunk-review/SKILL.md).
+2. Load the Hunk review skill: [`skills/hunk-review/SKILL.md`](../skills/hunk-review/SKILL.md).
 3. If your agent needs an absolute path to the skill file, run `hunk skill path` from your local install.
 4. Ask the agent to use the skill and review the current session.
 
@@ -125,7 +125,7 @@ hunk diff --agent-context notes.json
 hunk patch change.patch --agent-context notes.json
 ```
 
-For a compact real example, see [`../examples/3-agent-review-demo/agent-context.json`](../examples/3-agent-review-demo/agent-context.json).
+For a compact real example, see [`examples/3-agent-review-demo/agent-context.json`](../examples/3-agent-review-demo/agent-context.json).
 
 ## Practical defaults
 
