@@ -153,15 +153,22 @@ All notable user-visible changes to Hunk are documented in this file.
 
 ### Added
 
-- Added prebuilt npm binary packaging and automated tagged GitHub/npm releases, including beta tag support ([#12](https://github.com/modem-dev/hunk/pull/12), [#14](https://github.com/modem-dev/hunk/pull/14), [#15](https://github.com/modem-dev/hunk/pull/15), [#32](https://github.com/modem-dev/hunk/pull/32)).
-- Added a top-level `hunk --version` command ([#19](https://github.com/modem-dev/hunk/pull/19)).
-- Added the experimental MCP daemon for live Hunk sessions and auto-started it when needed ([#22](https://github.com/modem-dev/hunk/pull/22), [#29](https://github.com/modem-dev/hunk/pull/29)).
+- Auto-started the MCP daemon when needed for live sessions ([#29](https://github.com/modem-dev/hunk/pull/29)).
 - Added arrow-key line-by-line scrolling ([#30](https://github.com/modem-dev/hunk/pull/30)).
+
+## [0.3.0] - 2026-03-22
+
+### Added
+
+- Added prebuilt npm binary packaging and automated npm releases, including beta tag support ([#12](https://github.com/modem-dev/hunk/pull/12), [#14](https://github.com/modem-dev/hunk/pull/14), [#15](https://github.com/modem-dev/hunk/pull/15)).
+- Added a top-level `hunk --version` command ([#19](https://github.com/modem-dev/hunk/pull/19)).
+- Added the experimental MCP daemon for live Hunk sessions ([#22](https://github.com/modem-dev/hunk/pull/22)).
 
 ### Changed
 
 - Always showed the diff rail while dimming inactive hunks ([#16](https://github.com/modem-dev/hunk/pull/16)).
 - Decoupled sidebar visibility from layout toggles ([#18](https://github.com/modem-dev/hunk/pull/18)).
+- Stopped auto-saving view preferences to config files ([#13](https://github.com/modem-dev/hunk/pull/13)).
 
 ### Fixed
 
@@ -170,19 +177,27 @@ All notable user-visible changes to Hunk are documented in this file.
 
 ## [0.2.0] - 2026-03-20
 
+### Fixed
+
+- Fixed npm installs by bundling Bun in published packages ([#11](https://github.com/modem-dev/hunk/pull/11)).
+
+## [0.1.0] - 2026-03-20
+
 ### Added
 
+- Initial Hunk release with split and stack terminal diff views built around a single multi-file review stream.
 - Added git-style `diff` and `show` commands plus a general Git pager wrapper for drop-in review workflows.
-- Added persistent Hunk view preferences across sessions.
+- Added persistent Hunk view preferences across sessions ([#7](https://github.com/modem-dev/hunk/pull/7)).
+- Added agent-note anchored review flows, responsive layouts, and display toggles for line numbers, wrapping, and hunk metadata.
 
 ### Changed
 
+- Simplified the review chrome around a menu bar, lighter borders, and diff-focused headers.
 - Improved startup and large-review performance with windowed diff sections and deferred syntax highlighting.
 
 ### Fixed
 
-- Stabilized viewport navigation, active-hunk scrolling, full-viewport paging, and syntax highlighting across interactive reviews.
-- Restored terminal screen cleanup on exit and fixed npm installs by bundling Bun in published packages.
+- Stabilized diff repainting, active-hunk scrolling, syntax highlighting, pager stdin patch handling, and terminal cleanup on exit.
 
 [Unreleased]: https://github.com/modem-dev/hunk/compare/v0.9.1...HEAD
 [0.9.1]: https://github.com/modem-dev/hunk/compare/v0.9.0...v0.9.1
@@ -194,5 +209,7 @@ All notable user-visible changes to Hunk are documented in this file.
 [0.6.0]: https://github.com/modem-dev/hunk/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/modem-dev/hunk/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/modem-dev/hunk/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/modem-dev/hunk/compare/v0.2.0...v0.4.0
-[0.2.0]: https://github.com/modem-dev/hunk/tree/v0.2.0
+[0.4.0]: https://github.com/modem-dev/hunk/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/modem-dev/hunk/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/modem-dev/hunk/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/modem-dev/hunk/tree/v0.1.0
