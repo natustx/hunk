@@ -100,7 +100,13 @@ function bundledBunRuntime() {
 
 const forwardedArgs = process.argv.slice(2);
 if (forwardedArgs.length === 2 && forwardedArgs[0] === "skill" && forwardedArgs[1] === "path") {
-  process.stdout.write(`${bundledSkillPath()}\n`);
+  const skillPath = bundledSkillPath();
+  if (!fs.existsSync(skillPath)) {
+    console.error(`hunk: could not locate the bundled Hunk review skill at ${skillPath}`);
+    process.exit(1);
+  }
+
+  process.stdout.write(`${skillPath}\n`);
   process.exit(0);
 }
 

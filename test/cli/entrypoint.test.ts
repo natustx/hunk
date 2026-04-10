@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -146,6 +146,35 @@ describe("CLI entrypoint contracts", () => {
     expect(stderr).toBe("");
     expect(resolvedPath).toEndWith(join("skills", "hunk-review", "SKILL.md"));
     expect(existsSync(resolvedPath)).toBe(true);
+  });
+
+  test("bin wrapper fails clearly when the bundled skill is missing", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "hunk-wrapper-skill-missing-"));
+    const tempBinDir = join(tempDir, "bin");
+    const tempWrapperPath = join(tempBinDir, "hunk.cjs");
+
+    try {
+      mkdirSync(tempBinDir, { recursive: true });
+      copyFileSync(join(process.cwd(), "bin", "hunk.cjs"), tempWrapperPath);
+
+      const proc = Bun.spawnSync(["node", tempWrapperPath, "skill", "path"], {
+        cwd: tempDir,
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: process.env,
+      });
+
+      const stdout = Buffer.from(proc.stdout).toString("utf8");
+      const stderr = Buffer.from(proc.stderr).toString("utf8");
+
+      expect(proc.exitCode).toBe(1);
+      expect(stdout).toBe("");
+      expect(stderr).toContain("hunk: could not locate the bundled Hunk review skill");
+      expect(stderr).toContain(join("skills", "hunk-review", "SKILL.md"));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test("general pager mode falls back to plain text for non-diff stdin", () => {
