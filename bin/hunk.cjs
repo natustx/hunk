@@ -5,6 +5,10 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
+function bundledSkillPath() {
+  return path.join(__dirname, "..", "skills", "hunk-review", "SKILL.md");
+}
+
 function ensureExecutable(target) {
   if (process.platform === "win32") {
     return;
@@ -94,21 +98,27 @@ function bundledBunRuntime() {
   }
 }
 
+const forwardedArgs = process.argv.slice(2);
+if (forwardedArgs.length === 2 && forwardedArgs[0] === "skill" && forwardedArgs[1] === "path") {
+  process.stdout.write(`${bundledSkillPath()}\n`);
+  process.exit(0);
+}
+
 const overrideBinary = process.env.HUNK_BIN_PATH;
 if (overrideBinary) {
-  run(overrideBinary, process.argv.slice(2));
+  run(overrideBinary, forwardedArgs);
 }
 
 const scriptDir = path.dirname(fs.realpathSync(__filename));
 const prebuiltBinary = findInstalledBinary(scriptDir);
 if (prebuiltBinary) {
-  run(prebuiltBinary, process.argv.slice(2));
+  run(prebuiltBinary, forwardedArgs);
 }
 
 const bunBinary = bundledBunRuntime();
 if (bunBinary) {
   const entrypoint = path.join(__dirname, "..", "dist", "npm", "main.js");
-  run(bunBinary, [entrypoint, ...process.argv.slice(2)]);
+  run(bunBinary, [entrypoint, ...forwardedArgs]);
 }
 
 const printablePackages = hostCandidates()
