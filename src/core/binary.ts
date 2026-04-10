@@ -46,7 +46,7 @@ function readFilePrefix(path: string) {
 }
 
 /** Return whether one byte is a strong binary signal instead of normal text content. */
-function isSuspiciousTextByte(byte: number) {
+function isBinarySignalByte(byte: number) {
   return byte < 0x07 || (byte > 0x0d && byte < 0x20) || byte === 0x7f;
 }
 
@@ -64,17 +64,17 @@ export function isProbablyBinaryFile(path: string) {
     return false;
   }
 
-  let suspiciousBytes = 0;
+  let binarySignalBytes = 0;
 
   for (const byte of prefix) {
     if (byte === 0) {
       return true;
     }
 
-    if (isSuspiciousTextByte(byte)) {
-      suspiciousBytes += 1;
+    if (isBinarySignalByte(byte)) {
+      binarySignalBytes += 1;
     }
   }
 
-  return suspiciousBytes / prefix.length >= BINARY_CONTROL_BYTE_RATIO;
+  return binarySignalBytes / prefix.length >= BINARY_CONTROL_BYTE_RATIO;
 }
