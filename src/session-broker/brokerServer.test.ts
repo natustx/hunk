@@ -510,8 +510,9 @@ describe("Hunk session daemon server", () => {
     process.env.HUNK_MCP_HOST = "127.0.0.1";
     process.env.HUNK_MCP_PORT = String(port);
 
-    const original = SessionBrokerState.prototype.sendReloadSession;
-    SessionBrokerState.prototype.sendReloadSession = function (input) {
+    const original = SessionBrokerState.prototype.dispatchCommand;
+    SessionBrokerState.prototype.dispatchCommand = (({ command, input }: any) => {
+      expect(command).toBe("reload_session");
       expect(input).toMatchObject({
         sessionPath: "/tmp/live-session",
         sourcePath: "/tmp/source-repo",
@@ -530,7 +531,7 @@ describe("Hunk session daemon server", () => {
         fileCount: 0,
         selectedHunkIndex: 0,
       });
-    };
+    }) as SessionBrokerState["dispatchCommand"];
 
     const server = serveSessionBrokerDaemon();
 
@@ -561,7 +562,7 @@ describe("Hunk session daemon server", () => {
         },
       });
     } finally {
-      SessionBrokerState.prototype.sendReloadSession = original;
+      SessionBrokerState.prototype.dispatchCommand = original;
       server.stop(true);
     }
   });
@@ -571,8 +572,9 @@ describe("Hunk session daemon server", () => {
     process.env.HUNK_MCP_HOST = "127.0.0.1";
     process.env.HUNK_MCP_PORT = String(port);
 
-    const original = SessionBrokerState.prototype.sendCommentBatch;
-    SessionBrokerState.prototype.sendCommentBatch = function (input) {
+    const original = SessionBrokerState.prototype.dispatchCommand;
+    SessionBrokerState.prototype.dispatchCommand = (({ command, input }: any) => {
+      expect(command).toBe("comment_batch");
       expect(input).toMatchObject({
         sessionId: "session-1",
         revealMode: "none",
@@ -613,7 +615,7 @@ describe("Hunk session daemon server", () => {
           },
         ],
       });
-    };
+    }) as SessionBrokerState["dispatchCommand"];
 
     const server = serveSessionBrokerDaemon();
 
@@ -655,7 +657,7 @@ describe("Hunk session daemon server", () => {
         },
       });
     } finally {
-      SessionBrokerState.prototype.sendCommentBatch = original;
+      SessionBrokerState.prototype.dispatchCommand = original;
       server.stop(true);
     }
   });

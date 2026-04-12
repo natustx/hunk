@@ -366,60 +366,147 @@ export class SessionBrokerState {
     return removed;
   }
 
+  /** Dispatch one app-owned command through the generic broker transport. */
+  dispatchCommand<
+    ResultType extends HunkSessionCommandResult,
+    CommandName extends HunkSessionServerMessage["command"],
+  >({
+    selector,
+    command,
+    input,
+    timeoutMessage,
+    timeoutMs = 15_000,
+  }: {
+    selector: SessionTargetInput;
+    command: CommandName;
+    input: Extract<HunkSessionServerMessage, { command: CommandName }>["input"];
+    timeoutMessage: string;
+    timeoutMs?: number;
+  }) {
+    const session = resolveSessionTarget(this.listSessions(), selector);
+    const requestId = randomUUID();
+
+    return new Promise<ResultType>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingCommands.delete(requestId);
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+
+      this.pendingCommands.set(requestId, {
+        sessionId: session.sessionId,
+        resolve: (result) => resolve(result as ResultType),
+        reject,
+        timeout,
+      });
+
+      const entry = this.sessions.get(session.sessionId);
+      if (!entry) {
+        clearTimeout(timeout);
+        this.pendingCommands.delete(requestId);
+        reject(new Error("The targeted session is no longer connected."));
+        return;
+      }
+
+      try {
+        const message = {
+          type: "command",
+          requestId,
+          command,
+          input,
+        } as Extract<HunkSessionServerMessage, { command: CommandName }>;
+
+        entry.socket.send(JSON.stringify(message));
+      } catch (error) {
+        clearTimeout(timeout);
+        this.pendingCommands.delete(requestId);
+        reject(
+          error instanceof Error
+            ? error
+            : new Error("The targeted session could not receive the command."),
+        );
+      }
+    });
+  }
+
+  /** Keep temporary Hunk-oriented helpers while callers migrate onto generic dispatch. */
   sendComment(input: CommentToolInput) {
-    return this.sendCommand<AppliedCommentResult, "comment">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "comment",
+    return this.dispatchCommand<AppliedCommentResult, "comment">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "comment",
       input,
-      "Timed out waiting for the session to apply the comment.",
-    );
+      timeoutMessage: "Timed out waiting for the session to apply the comment.",
+    });
   }
 
   sendCommentBatch(input: CommentBatchToolInput) {
-    return this.sendCommand<AppliedCommentBatchResult, "comment_batch">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "comment_batch",
+    return this.dispatchCommand<AppliedCommentBatchResult, "comment_batch">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "comment_batch",
       input,
-      "Timed out waiting for the session to apply the comment batch.",
-      30_000,
-    );
+      timeoutMessage: "Timed out waiting for the session to apply the comment batch.",
+      timeoutMs: 30_000,
+    });
   }
 
   sendNavigateToHunk(input: NavigateToHunkToolInput) {
-    return this.sendCommand<NavigatedSelectionResult, "navigate_to_hunk">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "navigate_to_hunk",
+    return this.dispatchCommand<NavigatedSelectionResult, "navigate_to_hunk">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "navigate_to_hunk",
       input,
-      "Timed out waiting for the session to navigate to the requested hunk.",
-    );
+      timeoutMessage: "Timed out waiting for the session to navigate to the requested hunk.",
+    });
   }
 
   sendReloadSession(input: ReloadSessionToolInput) {
-    return this.sendCommand<ReloadedSessionResult, "reload_session">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "reload_session",
+    return this.dispatchCommand<ReloadedSessionResult, "reload_session">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "reload_session",
       input,
-      "Timed out waiting for the session to reload the requested contents.",
-      30_000,
-    );
+      timeoutMessage: "Timed out waiting for the session to reload the requested contents.",
+      timeoutMs: 30_000,
+    });
   }
 
   sendRemoveComment(input: RemoveCommentToolInput) {
-    return this.sendCommand<RemovedCommentResult, "remove_comment">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "remove_comment",
+    return this.dispatchCommand<RemovedCommentResult, "remove_comment">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "remove_comment",
       input,
-      "Timed out waiting for the session to remove the requested comment.",
-    );
+      timeoutMessage: "Timed out waiting for the session to remove the requested comment.",
+    });
   }
 
   sendClearComments(input: ClearCommentsToolInput) {
-    return this.sendCommand<ClearedCommentsResult, "clear_comments">(
-      { sessionId: input.sessionId, sessionPath: input.sessionPath, repoRoot: input.repoRoot },
-      "clear_comments",
+    return this.dispatchCommand<ClearedCommentsResult, "clear_comments">({
+      selector: {
+        sessionId: input.sessionId,
+        sessionPath: input.sessionPath,
+        repoRoot: input.repoRoot,
+      },
+      command: "clear_comments",
       input,
-      "Timed out waiting for the session to clear the requested comments.",
-    );
+      timeoutMessage: "Timed out waiting for the session to clear the requested comments.",
+    });
   }
 
   handleCommandResult(message: {
@@ -464,61 +551,6 @@ export class SessionBrokerState {
     }
 
     return entry;
-  }
-
-  private sendCommand<
-    ResultType extends HunkSessionCommandResult,
-    CommandName extends HunkSessionServerMessage["command"],
-  >(
-    selector: SessionTargetInput,
-    command: CommandName,
-    input: Extract<HunkSessionServerMessage, { command: CommandName }>["input"],
-    timeoutMessage: string,
-    timeoutMs = 15_000,
-  ) {
-    const session = resolveSessionTarget(this.listSessions(), selector);
-    const requestId = randomUUID();
-
-    return new Promise<ResultType>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingCommands.delete(requestId);
-        reject(new Error(timeoutMessage));
-      }, timeoutMs);
-
-      this.pendingCommands.set(requestId, {
-        sessionId: session.sessionId,
-        resolve: (result) => resolve(result as ResultType),
-        reject,
-        timeout,
-      });
-
-      const entry = this.sessions.get(session.sessionId);
-      if (!entry) {
-        clearTimeout(timeout);
-        this.pendingCommands.delete(requestId);
-        reject(new Error("The targeted session is no longer connected."));
-        return;
-      }
-
-      try {
-        const message = {
-          type: "command",
-          requestId,
-          command,
-          input,
-        } as Extract<HunkSessionServerMessage, { command: CommandName }>;
-
-        entry.socket.send(JSON.stringify(message));
-      } catch (error) {
-        clearTimeout(timeout);
-        this.pendingCommands.delete(requestId);
-        reject(
-          error instanceof Error
-            ? error
-            : new Error("The targeted session could not receive the command."),
-        );
-      }
-    });
   }
 
   private removeSession(sessionId: string, error: Error) {

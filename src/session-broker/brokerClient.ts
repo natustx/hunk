@@ -1,15 +1,9 @@
 import type {
-  AppliedCommentBatchResult,
-  AppliedCommentResult,
-  ClearedCommentsResult,
   HunkSessionClientMessage,
   HunkSessionCommandResult,
   HunkSessionRegistration,
   HunkSessionServerMessage,
   HunkSessionSnapshot,
-  NavigatedSelectionResult,
-  ReloadedSessionResult,
-  RemovedCommentResult,
 } from "../hunk-session/types";
 import {
   SESSION_BROKER_SOCKET_PATH,
@@ -35,24 +29,7 @@ const INCOMPATIBLE_SESSION_CLOSE_MESSAGE =
   "This window is too old for the refreshed session broker daemon. Restart the window to reconnect.";
 
 interface SessionAppBridge {
-  applyComment: (
-    message: Extract<HunkSessionServerMessage, { command: "comment" }>,
-  ) => Promise<AppliedCommentResult>;
-  applyCommentBatch: (
-    message: Extract<HunkSessionServerMessage, { command: "comment_batch" }>,
-  ) => Promise<AppliedCommentBatchResult>;
-  navigateToHunk: (
-    message: Extract<HunkSessionServerMessage, { command: "navigate_to_hunk" }>,
-  ) => Promise<NavigatedSelectionResult>;
-  reloadSession: (
-    message: Extract<HunkSessionServerMessage, { command: "reload_session" }>,
-  ) => Promise<ReloadedSessionResult>;
-  removeComment: (
-    message: Extract<HunkSessionServerMessage, { command: "remove_comment" }>,
-  ) => Promise<RemovedCommentResult>;
-  clearComments: (
-    message: Extract<HunkSessionServerMessage, { command: "clear_comments" }>,
-  ) => Promise<ClearedCommentsResult>;
+  dispatchCommand: (message: HunkSessionServerMessage) => Promise<HunkSessionCommandResult>;
 }
 
 /** Keep one running app session registered with the local session broker daemon. */
@@ -312,7 +289,7 @@ export class SessionBrokerClient {
     }
 
     try {
-      const result = await this.dispatchCommand(message);
+      const result = await this.bridge.dispatchCommand(message);
       this.send({
         type: "command-result",
         requestId: message.requestId,
@@ -326,27 +303,6 @@ export class SessionBrokerClient {
         ok: false,
         error: error instanceof Error ? error.message : "Unknown session error.",
       });
-    }
-  }
-
-  private dispatchCommand(message: HunkSessionServerMessage): Promise<HunkSessionCommandResult> {
-    if (!this.bridge) {
-      throw new Error("Session bridge is not connected.");
-    }
-
-    switch (message.command) {
-      case "comment":
-        return this.bridge.applyComment(message);
-      case "comment_batch":
-        return this.bridge.applyCommentBatch(message);
-      case "navigate_to_hunk":
-        return this.bridge.navigateToHunk(message);
-      case "reload_session":
-        return this.bridge.reloadSession(message);
-      case "remove_comment":
-        return this.bridge.removeComment(message);
-      case "clear_comments":
-        return this.bridge.clearComments(message);
     }
   }
 

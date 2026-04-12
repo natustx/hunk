@@ -81,7 +81,7 @@ function createMockHostClient() {
         throw new Error("Expected App to register a bridge before running the test command.");
       }
 
-      return bridge.navigateToHunk({
+      return bridge.dispatchCommand({
         type: "command",
         requestId: "test-request",
         command: "navigate_to_hunk",

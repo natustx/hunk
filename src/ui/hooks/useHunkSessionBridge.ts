@@ -108,32 +108,44 @@ export function useHunkSessionBridge({
     [clearLiveComments],
   );
 
+  const dispatchIncomingCommand = useCallback(
+    async (message: HunkSessionServerMessage) => {
+      switch (message.command) {
+        case "comment":
+          return applyIncomingComment(message);
+        case "comment_batch":
+          return applyIncomingCommentBatch(message);
+        case "navigate_to_hunk":
+          return navigateToHunkSelection(message);
+        case "reload_session":
+          return reloadIncomingSession(message);
+        case "remove_comment":
+          return removeIncomingComment(message);
+        case "clear_comments":
+          return clearIncomingComments(message);
+      }
+    },
+    [
+      applyIncomingComment,
+      applyIncomingCommentBatch,
+      clearIncomingComments,
+      navigateToHunkSelection,
+      reloadIncomingSession,
+      removeIncomingComment,
+    ],
+  );
+
   useEffect(() => {
     if (!hostClient) {
       return;
     }
 
-    hostClient.setBridge({
-      applyComment: applyIncomingComment,
-      applyCommentBatch: applyIncomingCommentBatch,
-      navigateToHunk: navigateToHunkSelection,
-      reloadSession: reloadIncomingSession,
-      removeComment: removeIncomingComment,
-      clearComments: clearIncomingComments,
-    });
+    hostClient.setBridge({ dispatchCommand: dispatchIncomingCommand });
 
     return () => {
       hostClient.setBridge(null);
     };
-  }, [
-    applyIncomingComment,
-    applyIncomingCommentBatch,
-    clearIncomingComments,
-    hostClient,
-    navigateToHunkSelection,
-    reloadIncomingSession,
-    removeIncomingComment,
-  ]);
+  }, [dispatchIncomingCommand, hostClient]);
 
   useEffect(() => {
     const selectedRange = selectedHunk ? hunkLineRange(selectedHunk) : undefined;

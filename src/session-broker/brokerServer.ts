@@ -4,7 +4,15 @@ import {
   resolveSessionBrokerConfig,
 } from "./brokerConfig";
 import { SessionBrokerState } from "./brokerState";
-import type { HunkSessionCommandResult } from "../hunk-session/types";
+import type {
+  AppliedCommentBatchResult,
+  AppliedCommentResult,
+  ClearedCommentsResult,
+  HunkSessionCommandResult,
+  NavigatedSelectionResult,
+  ReloadedSessionResult,
+  RemovedCommentResult,
+} from "../hunk-session/types";
 import {
   HUNK_SESSION_API_PATH,
   HUNK_SESSION_API_VERSION,
@@ -134,54 +142,76 @@ async function handleSessionApiRequest(state: SessionBrokerState, request: Reque
         }
 
         response = {
-          result: await state.sendNavigateToHunk({
-            ...input.selector,
-            filePath: input.filePath,
-            hunkIndex: input.hunkNumber !== undefined ? input.hunkNumber - 1 : undefined,
-            side: input.side,
-            line: input.line,
-            commentDirection: input.commentDirection,
+          result: await state.dispatchCommand<NavigatedSelectionResult, "navigate_to_hunk">({
+            selector: input.selector,
+            command: "navigate_to_hunk",
+            input: {
+              ...input.selector,
+              filePath: input.filePath,
+              hunkIndex: input.hunkNumber !== undefined ? input.hunkNumber - 1 : undefined,
+              side: input.side,
+              line: input.line,
+              commentDirection: input.commentDirection,
+            },
+            timeoutMessage: "Timed out waiting for the session to navigate to the requested hunk.",
           }),
         };
         break;
       }
       case "reload":
         response = {
-          result: await state.sendReloadSession({
-            ...input.selector,
-            nextInput: input.nextInput,
-            sourcePath: input.sourcePath,
+          result: await state.dispatchCommand<ReloadedSessionResult, "reload_session">({
+            selector: input.selector,
+            command: "reload_session",
+            input: {
+              ...input.selector,
+              nextInput: input.nextInput,
+              sourcePath: input.sourcePath,
+            },
+            timeoutMessage: "Timed out waiting for the session to reload the requested contents.",
+            timeoutMs: 30_000,
           }),
         };
         break;
       case "comment-add":
         response = {
-          result: await state.sendComment({
-            ...input.selector,
-            filePath: input.filePath,
-            side: input.side,
-            line: input.line,
-            summary: input.summary,
-            rationale: input.rationale,
-            author: input.author,
-            reveal: input.reveal,
+          result: await state.dispatchCommand<AppliedCommentResult, "comment">({
+            selector: input.selector,
+            command: "comment",
+            input: {
+              ...input.selector,
+              filePath: input.filePath,
+              side: input.side,
+              line: input.line,
+              summary: input.summary,
+              rationale: input.rationale,
+              author: input.author,
+              reveal: input.reveal,
+            },
+            timeoutMessage: "Timed out waiting for the session to apply the comment.",
           }),
         };
         break;
       case "comment-apply":
         response = {
-          result: await state.sendCommentBatch({
-            ...input.selector,
-            comments: input.comments.map((comment) => ({
-              filePath: comment.filePath,
-              hunkIndex: comment.hunkNumber !== undefined ? comment.hunkNumber - 1 : undefined,
-              side: comment.side,
-              line: comment.line,
-              summary: comment.summary,
-              rationale: comment.rationale,
-              author: comment.author,
-            })),
-            revealMode: input.revealMode,
+          result: await state.dispatchCommand<AppliedCommentBatchResult, "comment_batch">({
+            selector: input.selector,
+            command: "comment_batch",
+            input: {
+              ...input.selector,
+              comments: input.comments.map((comment) => ({
+                filePath: comment.filePath,
+                hunkIndex: comment.hunkNumber !== undefined ? comment.hunkNumber - 1 : undefined,
+                side: comment.side,
+                line: comment.line,
+                summary: comment.summary,
+                rationale: comment.rationale,
+                author: comment.author,
+              })),
+              revealMode: input.revealMode,
+            },
+            timeoutMessage: "Timed out waiting for the session to apply the comment batch.",
+            timeoutMs: 30_000,
           }),
         };
         break;
@@ -192,17 +222,27 @@ async function handleSessionApiRequest(state: SessionBrokerState, request: Reque
         break;
       case "comment-rm":
         response = {
-          result: await state.sendRemoveComment({
-            ...input.selector,
-            commentId: input.commentId,
+          result: await state.dispatchCommand<RemovedCommentResult, "remove_comment">({
+            selector: input.selector,
+            command: "remove_comment",
+            input: {
+              ...input.selector,
+              commentId: input.commentId,
+            },
+            timeoutMessage: "Timed out waiting for the session to remove the requested comment.",
           }),
         };
         break;
       case "comment-clear":
         response = {
-          result: await state.sendClearComments({
-            ...input.selector,
-            filePath: input.filePath,
+          result: await state.dispatchCommand<ClearedCommentsResult, "clear_comments">({
+            selector: input.selector,
+            command: "clear_comments",
+            input: {
+              ...input.selector,
+              filePath: input.filePath,
+            },
+            timeoutMessage: "Timed out waiting for the session to clear the requested comments.",
           }),
         };
         break;
