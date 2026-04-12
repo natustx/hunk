@@ -1,16 +1,9 @@
-import { useCallback, useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { CliInput, DiffFile } from "../../core/types";
 import { hunkLineRange } from "../../core/liveComments";
 import { SessionBrokerClient } from "../../session-broker/brokerClient";
-import type {
-  AppliedCommentBatchResult,
-  AppliedCommentResult,
-  ClearedCommentsResult,
-  HunkSessionServerMessage,
-  ReloadedSessionResult,
-  RemovedCommentResult,
-  SessionLiveCommentSummary,
-} from "../../hunk-session/types";
+import { createHunkSessionBridge } from "../../hunk-session/bridge";
+import type { ReloadedSessionResult, SessionLiveCommentSummary } from "../../hunk-session/types";
 import type { ReviewController } from "./useReviewController";
 
 /** Bridge one live Hunk review session to the local session daemon. */
@@ -48,90 +41,25 @@ export function useHunkSessionBridge({
   selectedHunkIndex: number;
   showAgentNotes: boolean;
 }) {
-  const navigateToHunkSelection = useCallback(
-    async (message: Extract<HunkSessionServerMessage, { command: "navigate_to_hunk" }>) =>
-      navigateToLocation(message.input),
-    [navigateToLocation],
-  );
-
-  const applyIncomingComment = useCallback(
-    async (
-      message: Extract<HunkSessionServerMessage, { command: "comment" }>,
-    ): Promise<AppliedCommentResult> => {
-      const result = addLiveComment(message.input, `mcp:${message.requestId}`, {
-        reveal: message.input.reveal,
-      });
-
-      if (message.input.reveal ?? false) {
-        openAgentNotes();
-      }
-
-      return result;
-    },
-    [addLiveComment, openAgentNotes],
-  );
-
-  const applyIncomingCommentBatch = useCallback(
-    async (
-      message: Extract<HunkSessionServerMessage, { command: "comment_batch" }>,
-    ): Promise<AppliedCommentBatchResult> => {
-      const result = addLiveCommentBatch(message.input.comments, message.requestId, {
-        revealMode: message.input.revealMode,
-      });
-
-      if (message.input.revealMode === "first" && result.applied.length > 0) {
-        openAgentNotes();
-      }
-
-      return result;
-    },
-    [addLiveCommentBatch, openAgentNotes],
-  );
-
-  const reloadIncomingSession = useCallback(
-    async (message: Extract<HunkSessionServerMessage, { command: "reload_session" }>) =>
-      reloadSession(message.input.nextInput, { sourcePath: message.input.sourcePath }),
-    [reloadSession],
-  );
-
-  const removeIncomingComment = useCallback(
-    async (
-      message: Extract<HunkSessionServerMessage, { command: "remove_comment" }>,
-    ): Promise<RemovedCommentResult> => removeLiveComment(message.input.commentId),
-    [removeLiveComment],
-  );
-
-  const clearIncomingComments = useCallback(
-    async (
-      message: Extract<HunkSessionServerMessage, { command: "clear_comments" }>,
-    ): Promise<ClearedCommentsResult> => clearLiveComments(message.input.filePath),
-    [clearLiveComments],
-  );
-
-  const dispatchIncomingCommand = useCallback(
-    async (message: HunkSessionServerMessage) => {
-      switch (message.command) {
-        case "comment":
-          return applyIncomingComment(message);
-        case "comment_batch":
-          return applyIncomingCommentBatch(message);
-        case "navigate_to_hunk":
-          return navigateToHunkSelection(message);
-        case "reload_session":
-          return reloadIncomingSession(message);
-        case "remove_comment":
-          return removeIncomingComment(message);
-        case "clear_comments":
-          return clearIncomingComments(message);
-      }
-    },
+  const bridge = useMemo(
+    () =>
+      createHunkSessionBridge({
+        addLiveComment,
+        addLiveCommentBatch,
+        clearLiveComments,
+        navigateToLocation,
+        openAgentNotes,
+        reloadSession: (nextInput, options) => reloadSession(nextInput, { ...options }),
+        removeLiveComment,
+      }),
     [
-      applyIncomingComment,
-      applyIncomingCommentBatch,
-      clearIncomingComments,
-      navigateToHunkSelection,
-      reloadIncomingSession,
-      removeIncomingComment,
+      addLiveComment,
+      addLiveCommentBatch,
+      clearLiveComments,
+      navigateToLocation,
+      openAgentNotes,
+      reloadSession,
+      removeLiveComment,
     ],
   );
 
@@ -140,12 +68,12 @@ export function useHunkSessionBridge({
       return;
     }
 
-    hostClient.setBridge({ dispatchCommand: dispatchIncomingCommand });
+    hostClient.setBridge(bridge);
 
     return () => {
       hostClient.setBridge(null);
     };
-  }, [dispatchIncomingCommand, hostClient]);
+  }, [bridge, hostClient]);
 
   useEffect(() => {
     const selectedRange = selectedHunk ? hunkLineRange(selectedHunk) : undefined;

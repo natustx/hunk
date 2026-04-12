@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { parseSessionRegistration, parseSessionSnapshot } from "../hunk-session/wire";
+import {
+  buildHunkSessionReview,
+  buildListedHunkSession,
+  buildSelectedHunkSessionContext,
+  listHunkSessionComments,
+} from "../hunk-session/projections";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -19,10 +24,9 @@ import type {
   RemoveCommentToolInput,
   RemovedCommentResult,
   SelectedSessionContext,
-  SessionFileSummary,
   SessionReview,
-  SessionReviewFile,
 } from "../hunk-session/types";
+import { parseSessionRegistration, parseSessionSnapshot } from "../hunk-session/wire";
 import type { SessionTargetInput } from "./types";
 
 interface PendingCommand {
@@ -54,54 +58,6 @@ export interface SessionTargetSelector {
 
 function describeSessionChoices(sessions: ListedSession[]) {
   return sessions.map((session) => `${session.sessionId} (${session.title})`).join(", ");
-}
-
-function findSelectedFile(session: ListedSession) {
-  return (
-    session.files.find(
-      (file) =>
-        file.id === session.snapshot.state.selectedFileId ||
-        file.path === session.snapshot.state.selectedFilePath ||
-        file.previousPath === session.snapshot.state.selectedFilePath,
-    ) ?? null
-  );
-}
-
-/** Match one review-export file against the live snapshot's current file selection. */
-function findSelectedReviewFile(files: SessionReviewFile[], snapshot: HunkSessionSnapshot) {
-  return (
-    files.find(
-      (file) =>
-        file.id === snapshot.state.selectedFileId ||
-        file.path === snapshot.state.selectedFilePath ||
-        file.previousPath === snapshot.state.selectedFilePath,
-    ) ?? null
-  );
-}
-
-/** Reduce one review-export file back to the summary fields used by session listings. */
-function summarizeReviewFile(reviewFile: SessionReviewFile): SessionFileSummary {
-  return {
-    id: reviewFile.id,
-    path: reviewFile.path,
-    previousPath: reviewFile.previousPath,
-    additions: reviewFile.additions,
-    deletions: reviewFile.deletions,
-    hunkCount: reviewFile.hunkCount,
-  };
-}
-
-/** Serialize one review-export file while keeping raw patch text opt-in for callers. */
-function serializeReviewFile(
-  reviewFile: SessionReviewFile,
-  includePatch: boolean,
-): SessionReviewFile {
-  return includePatch
-    ? reviewFile
-    : {
-        ...summarizeReviewFile(reviewFile),
-        hunks: reviewFile.hunks,
-      };
 }
 
 /** Resolve which live session one external command should target. */
@@ -172,20 +128,7 @@ export class SessionBrokerState {
 
   listSessions(): ListedSession[] {
     return [...this.sessions.values()]
-      .map((entry) => ({
-        sessionId: entry.registration.sessionId,
-        pid: entry.registration.pid,
-        cwd: entry.registration.cwd,
-        repoRoot: entry.registration.repoRoot,
-        inputKind: entry.registration.info.inputKind,
-        title: entry.registration.info.title,
-        sourceLabel: entry.registration.info.sourceLabel,
-        launchedAt: entry.registration.launchedAt,
-        terminal: entry.registration.terminal,
-        fileCount: entry.registration.info.files.length,
-        files: entry.registration.info.files.map(summarizeReviewFile),
-        snapshot: entry.snapshot,
-      }))
+      .map(buildListedHunkSession)
       .sort((left, right) => right.snapshot.updatedAt.localeCompare(left.snapshot.updatedAt));
   }
 
@@ -198,61 +141,15 @@ export class SessionBrokerState {
     selector: SessionTargetSelector,
     options: { includePatch?: boolean } = {},
   ): SessionReview {
-    const entry = this.getSessionEntry(selector);
-    const { registration, snapshot } = entry;
-    const selectedFile = findSelectedReviewFile(registration.info.files, snapshot);
-    const includePatch = options.includePatch ?? false;
-
-    return {
-      sessionId: registration.sessionId,
-      title: registration.info.title,
-      sourceLabel: registration.info.sourceLabel,
-      cwd: registration.cwd,
-      repoRoot: registration.repoRoot,
-      inputKind: registration.info.inputKind,
-      selectedFile: selectedFile ? serializeReviewFile(selectedFile, includePatch) : null,
-      selectedHunk: selectedFile
-        ? (selectedFile.hunks[snapshot.state.selectedHunkIndex] ?? null)
-        : null,
-      showAgentNotes: snapshot.state.showAgentNotes,
-      liveCommentCount: snapshot.state.liveCommentCount,
-      files: registration.info.files.map((file) => serializeReviewFile(file, includePatch)),
-    };
+    return buildHunkSessionReview(this.getSessionEntry(selector), options);
   }
 
   getSelectedContext(selector: SessionTargetSelector): SelectedSessionContext {
-    const session = this.getSession(selector);
-    const selectedFile = findSelectedFile(session);
-
-    return {
-      sessionId: session.sessionId,
-      title: session.title,
-      sourceLabel: session.sourceLabel,
-      cwd: session.cwd,
-      repoRoot: session.repoRoot,
-      inputKind: session.inputKind,
-      selectedFile,
-      selectedHunk: selectedFile
-        ? {
-            index: session.snapshot.state.selectedHunkIndex,
-            oldRange: session.snapshot.state.selectedHunkOldRange,
-            newRange: session.snapshot.state.selectedHunkNewRange,
-          }
-        : null,
-      showAgentNotes: session.snapshot.state.showAgentNotes,
-      liveCommentCount: session.snapshot.state.liveCommentCount,
-    };
+    return buildSelectedHunkSessionContext(this.getSession(selector));
   }
 
   listComments(selector: SessionTargetSelector, filter: { filePath?: string } = {}) {
-    const session = this.getSession(selector);
-    const comments = session.snapshot.state.liveComments;
-
-    if (!filter.filePath) {
-      return comments;
-    }
-
-    return comments.filter((comment) => comment.filePath === filter.filePath);
+    return listHunkSessionComments(this.getSession(selector), filter);
   }
 
   getSessionCount() {
