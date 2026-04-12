@@ -27,6 +27,7 @@ import type {
   SessionReview,
 } from "../hunk-session/types";
 import { parseSessionRegistration, parseSessionSnapshot } from "../hunk-session/wire";
+import { matchesSessionSelector } from "./selectors";
 import type { SessionTargetInput } from "./types";
 
 interface PendingCommand {
@@ -63,7 +64,7 @@ function describeSessionChoices(sessions: ListedSession[]) {
 /** Resolve which live session one external command should target. */
 export function resolveSessionTarget(sessions: ListedSession[], selector: SessionTargetSelector) {
   if (selector.sessionId) {
-    const matched = sessions.find((session) => session.sessionId === selector.sessionId);
+    const matched = sessions.find((session) => matchesSessionSelector(session, selector));
     if (!matched) {
       throw new Error(`No active session matches sessionId ${selector.sessionId}.`);
     }
@@ -73,7 +74,7 @@ export function resolveSessionTarget(sessions: ListedSession[], selector: Sessio
 
   const sessionPath = selector.sessionPath;
   if (sessionPath) {
-    const matches = sessions.filter((session) => session.cwd === sessionPath);
+    const matches = sessions.filter((session) => matchesSessionSelector(session, selector));
     if (matches.length === 0) {
       throw new Error(`No active session matches session path ${sessionPath}.`);
     }
@@ -89,7 +90,7 @@ export function resolveSessionTarget(sessions: ListedSession[], selector: Sessio
   }
 
   if (selector.repoRoot) {
-    const matches = sessions.filter((session) => session.repoRoot === selector.repoRoot);
+    const matches = sessions.filter((session) => matchesSessionSelector(session, selector));
     if (matches.length === 0) {
       throw new Error(`No active session matches repoRoot ${selector.repoRoot}.`);
     }
