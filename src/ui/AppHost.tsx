@@ -4,11 +4,11 @@ import { loadAppBootstrap } from "../core/loaders";
 import { resolveRuntimeCliInput } from "../core/terminal";
 import type { AppBootstrap, CliInput } from "../core/types";
 import type { UpdateNotice } from "../core/updateNotice";
-import { HunkHostClient } from "../daemon/client";
+import { HunkHostClient } from "../session-broker/client";
 import {
   createInitialSessionSnapshot,
   updateSessionRegistration,
-} from "../daemon/sessionRegistration";
+} from "../hunk-session/sessionRegistration";
 import { App } from "./App";
 import { useStartupUpdateNotice } from "./hooks/useStartupUpdateNotice";
 

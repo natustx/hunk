@@ -8,12 +8,12 @@ import { shutdownSession } from "./core/shutdown";
 import { prepareStartupPlan } from "./core/startup";
 import { resolveStartupUpdateNotice } from "./core/updateNotice";
 import { AppHost } from "./ui/AppHost";
-import { HunkHostClient } from "./daemon/client";
-import { serveHunkSessionDaemon } from "./daemon/server";
+import { HunkHostClient } from "./session-broker/client";
+import { serveHunkSessionDaemon } from "./session-broker/server";
 import {
   createInitialSessionSnapshot,
   createSessionRegistration,
-} from "./daemon/sessionRegistration";
+} from "./hunk-session/sessionRegistration";
 import { runSessionCommand } from "./session/commands";
 
 async function main() {

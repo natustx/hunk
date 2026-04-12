@@ -1,7 +1,7 @@
 import {
   resolveHunkSessionDaemonConfig,
   type ResolvedHunkSessionDaemonConfig,
-} from "../daemon/config";
+} from "../session-broker/config";
 import {
   HUNK_SESSION_API_VERSION,
   HUNK_SESSION_CAPABILITIES_PATH,

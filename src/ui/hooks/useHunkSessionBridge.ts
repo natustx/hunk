@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import type { CliInput, DiffFile } from "../../core/types";
 import { hunkLineRange } from "../../core/liveComments";
-import { HunkHostClient } from "../../daemon/client";
+import { HunkHostClient } from "../../session-broker/client";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -10,7 +10,7 @@ import type {
   RemovedCommentResult,
   SessionLiveCommentSummary,
   SessionServerMessage,
-} from "../../daemon/types";
+} from "../../session-broker/types";
 import type { ReviewController } from "./useReviewController";
 
 /** Bridge one live Hunk review session to the local session daemon. */

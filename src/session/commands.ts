@@ -18,8 +18,8 @@ import {
   isLoopbackPortReachable,
   readHunkDaemonHealth,
   waitForHunkDaemonShutdown,
-} from "../daemon/daemonLauncher";
-import { resolveHunkSessionDaemonConfig } from "../daemon/config";
+} from "../session-broker/daemonLauncher";
+import { resolveHunkSessionDaemonConfig } from "../session-broker/config";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -33,7 +33,7 @@ import type {
   SessionReview,
   SessionTerminalLocation,
   SessionTerminalMetadata,
-} from "../daemon/types";
+} from "../session-broker/types";
 import { readHunkSessionDaemonCapabilities, reportHunkDaemonUpgradeRestart } from "./capabilities";
 import {
   HUNK_SESSION_API_PATH,

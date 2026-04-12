@@ -31,7 +31,7 @@ import type {
   NavigatedSelectionResult,
   RemovedCommentResult,
   SessionLiveCommentSummary,
-} from "../../daemon/types";
+} from "../../session-broker/types";
 import { findNextHunkCursor } from "../lib/hunks";
 import {
   buildReviewState,

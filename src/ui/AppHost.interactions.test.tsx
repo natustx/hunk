@@ -4,13 +4,13 @@ import { join } from "node:path";
 import { describe, expect, mock, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act } from "react";
-import type { HunkHostClient } from "../daemon/client";
-import { HUNK_SESSION_REGISTRATION_VERSION } from "../daemon/sessionWire";
+import type { HunkHostClient } from "../session-broker/client";
+import { HUNK_SESSION_REGISTRATION_VERSION } from "../session-broker/sessionWire";
 import type {
   HunkSessionRegistration,
   HunkSessionSnapshot,
   SessionServerMessage,
-} from "../daemon/types";
+} from "../session-broker/types";
 import type { AppBootstrap, LayoutMode } from "../core/types";
 import { createTestGitAppBootstrap } from "../../test/helpers/app-bootstrap";
 import { createTestDiffFile as buildTestDiffFile, lines } from "../../test/helpers/diff-helpers";

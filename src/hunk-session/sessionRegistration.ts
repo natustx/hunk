@@ -3,9 +3,13 @@ import { spawnSync } from "node:child_process";
 import { formatHunkHeader } from "../core/hunkHeader";
 import { hunkLineRange } from "../core/liveComments";
 import type { AppBootstrap } from "../core/types";
-import { resolveSessionTerminalMetadata } from "./sessionTerminalMetadata";
-import { HUNK_SESSION_REGISTRATION_VERSION } from "./sessionWire";
-import type { HunkSessionRegistration, HunkSessionSnapshot, SessionReviewFile } from "./types";
+import { resolveSessionTerminalMetadata } from "../session-broker/sessionTerminalMetadata";
+import { HUNK_SESSION_REGISTRATION_VERSION } from "../session-broker/sessionWire";
+import type {
+  HunkSessionRegistration,
+  HunkSessionSnapshot,
+  SessionReviewFile,
+} from "../session-broker/types";
 
 /** Resolve the TTY device path for the current process, if available. */
 function ttyname(): string | undefined {
