@@ -8,7 +8,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useRef } fro
 import type { AppBootstrap, CliInput, LayoutMode } from "../core/types";
 import { canReloadInput, computeWatchSignature } from "../core/watch";
 import { SessionBrokerClient } from "../session-broker/brokerClient";
-import type { ReloadedSessionResult } from "../session-broker/types";
+import type { ReloadedSessionResult } from "../hunk-session/types";
 import { MenuBar } from "./components/chrome/MenuBar";
 import { StatusBar } from "./components/chrome/StatusBar";
 import { DiffPane } from "./components/panes/DiffPane";

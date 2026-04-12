@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { parseSessionRegistration, parseSessionSnapshot } from "./brokerWire";
+import { parseSessionRegistration, parseSessionSnapshot } from "../hunk-session/wire";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -7,8 +7,10 @@ import type {
   ClearCommentsToolInput,
   CommentBatchToolInput,
   CommentToolInput,
-  SessionRegistration,
-  SessionSnapshot,
+  HunkSessionCommandResult,
+  HunkSessionRegistration,
+  HunkSessionServerMessage,
+  HunkSessionSnapshot,
   ListedSession,
   NavigateToHunkToolInput,
   NavigatedSelectionResult,
@@ -17,17 +19,15 @@ import type {
   RemoveCommentToolInput,
   RemovedCommentResult,
   SelectedSessionContext,
-  SessionCommandResult,
   SessionFileSummary,
   SessionReview,
   SessionReviewFile,
-  SessionServerMessage,
-  SessionTargetInput,
-} from "./types";
+} from "../hunk-session/types";
+import type { SessionTargetInput } from "./types";
 
 interface PendingCommand {
   sessionId: string;
-  resolve: (result: SessionCommandResult) => void;
+  resolve: (result: HunkSessionCommandResult) => void;
   reject: (error: Error) => void;
   timeout: Timer;
 }
@@ -37,8 +37,8 @@ interface DaemonSessionSocket {
 }
 
 interface SessionEntry {
-  registration: SessionRegistration;
-  snapshot: SessionSnapshot;
+  registration: HunkSessionRegistration;
+  snapshot: HunkSessionSnapshot;
   socket: DaemonSessionSocket;
   connectedAt: string;
   lastSeenAt: string;
@@ -60,21 +60,21 @@ function findSelectedFile(session: ListedSession) {
   return (
     session.files.find(
       (file) =>
-        file.id === session.snapshot.selectedFileId ||
-        file.path === session.snapshot.selectedFilePath ||
-        file.previousPath === session.snapshot.selectedFilePath,
+        file.id === session.snapshot.state.selectedFileId ||
+        file.path === session.snapshot.state.selectedFilePath ||
+        file.previousPath === session.snapshot.state.selectedFilePath,
     ) ?? null
   );
 }
 
 /** Match one review-export file against the live snapshot's current file selection. */
-function findSelectedReviewFile(files: SessionReviewFile[], snapshot: SessionSnapshot) {
+function findSelectedReviewFile(files: SessionReviewFile[], snapshot: HunkSessionSnapshot) {
   return (
     files.find(
       (file) =>
-        file.id === snapshot.selectedFileId ||
-        file.path === snapshot.selectedFilePath ||
-        file.previousPath === snapshot.selectedFilePath,
+        file.id === snapshot.state.selectedFileId ||
+        file.path === snapshot.state.selectedFilePath ||
+        file.previousPath === snapshot.state.selectedFilePath,
     ) ?? null
   );
 }
@@ -177,13 +177,13 @@ export class SessionBrokerState {
         pid: entry.registration.pid,
         cwd: entry.registration.cwd,
         repoRoot: entry.registration.repoRoot,
-        inputKind: entry.registration.inputKind,
-        title: entry.registration.title,
-        sourceLabel: entry.registration.sourceLabel,
+        inputKind: entry.registration.info.inputKind,
+        title: entry.registration.info.title,
+        sourceLabel: entry.registration.info.sourceLabel,
         launchedAt: entry.registration.launchedAt,
         terminal: entry.registration.terminal,
-        fileCount: entry.registration.files.length,
-        files: entry.registration.files.map(summarizeReviewFile),
+        fileCount: entry.registration.info.files.length,
+        files: entry.registration.info.files.map(summarizeReviewFile),
         snapshot: entry.snapshot,
       }))
       .sort((left, right) => right.snapshot.updatedAt.localeCompare(left.snapshot.updatedAt));
@@ -200,21 +200,23 @@ export class SessionBrokerState {
   ): SessionReview {
     const entry = this.getSessionEntry(selector);
     const { registration, snapshot } = entry;
-    const selectedFile = findSelectedReviewFile(registration.files, snapshot);
+    const selectedFile = findSelectedReviewFile(registration.info.files, snapshot);
     const includePatch = options.includePatch ?? false;
 
     return {
       sessionId: registration.sessionId,
-      title: registration.title,
-      sourceLabel: registration.sourceLabel,
+      title: registration.info.title,
+      sourceLabel: registration.info.sourceLabel,
       cwd: registration.cwd,
       repoRoot: registration.repoRoot,
-      inputKind: registration.inputKind,
+      inputKind: registration.info.inputKind,
       selectedFile: selectedFile ? serializeReviewFile(selectedFile, includePatch) : null,
-      selectedHunk: selectedFile ? (selectedFile.hunks[snapshot.selectedHunkIndex] ?? null) : null,
-      showAgentNotes: snapshot.showAgentNotes,
-      liveCommentCount: snapshot.liveCommentCount,
-      files: registration.files.map((file) => serializeReviewFile(file, includePatch)),
+      selectedHunk: selectedFile
+        ? (selectedFile.hunks[snapshot.state.selectedHunkIndex] ?? null)
+        : null,
+      showAgentNotes: snapshot.state.showAgentNotes,
+      liveCommentCount: snapshot.state.liveCommentCount,
+      files: registration.info.files.map((file) => serializeReviewFile(file, includePatch)),
     };
   }
 
@@ -232,19 +234,19 @@ export class SessionBrokerState {
       selectedFile,
       selectedHunk: selectedFile
         ? {
-            index: session.snapshot.selectedHunkIndex,
-            oldRange: session.snapshot.selectedHunkOldRange,
-            newRange: session.snapshot.selectedHunkNewRange,
+            index: session.snapshot.state.selectedHunkIndex,
+            oldRange: session.snapshot.state.selectedHunkOldRange,
+            newRange: session.snapshot.state.selectedHunkNewRange,
           }
         : null,
-      showAgentNotes: session.snapshot.showAgentNotes,
-      liveCommentCount: session.snapshot.liveCommentCount,
+      showAgentNotes: session.snapshot.state.showAgentNotes,
+      liveCommentCount: session.snapshot.state.liveCommentCount,
     };
   }
 
   listComments(selector: SessionTargetSelector, filter: { filePath?: string } = {}) {
     const session = this.getSession(selector);
-    const comments = session.snapshot.liveComments;
+    const comments = session.snapshot.state.liveComments;
 
     if (!filter.filePath) {
       return comments;
@@ -423,7 +425,7 @@ export class SessionBrokerState {
   handleCommandResult(message: {
     requestId: string;
     ok: boolean;
-    result?: SessionCommandResult;
+    result?: HunkSessionCommandResult;
     error?: string;
   }) {
     const pending = this.pendingCommands.get(message.requestId);
@@ -465,12 +467,12 @@ export class SessionBrokerState {
   }
 
   private sendCommand<
-    ResultType extends SessionCommandResult,
-    CommandName extends SessionServerMessage["command"],
+    ResultType extends HunkSessionCommandResult,
+    CommandName extends HunkSessionServerMessage["command"],
   >(
     selector: SessionTargetInput,
     command: CommandName,
-    input: Extract<SessionServerMessage, { command: CommandName }>["input"],
+    input: Extract<HunkSessionServerMessage, { command: CommandName }>["input"],
     timeoutMessage: string,
     timeoutMs = 15_000,
   ) {
@@ -504,7 +506,7 @@ export class SessionBrokerState {
           requestId,
           command,
           input,
-        } as Extract<SessionServerMessage, { command: CommandName }>;
+        } as Extract<HunkSessionServerMessage, { command: CommandName }>;
 
         entry.socket.send(JSON.stringify(message));
       } catch (error) {

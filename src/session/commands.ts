@@ -31,9 +31,8 @@ import type {
   SelectedSessionContext,
   SessionLiveCommentSummary,
   SessionReview,
-  SessionTerminalLocation,
-  SessionTerminalMetadata,
-} from "../session-broker/types";
+} from "../hunk-session/types";
+import type { SessionTerminalLocation, SessionTerminalMetadata } from "../session-broker/types";
 import { readHunkSessionDaemonCapabilities, reportHunkDaemonUpgradeRestart } from "./capabilities";
 import {
   HUNK_SESSION_API_PATH,
@@ -352,8 +351,10 @@ function formatSelector(selector: SessionSelectorInput) {
 }
 
 function formatSelectedSummary(session: ListedSession) {
-  const filePath = session.snapshot.selectedFilePath ?? "(none)";
-  const hunkNumber = session.snapshot.selectedFilePath ? session.snapshot.selectedHunkIndex + 1 : 0;
+  const filePath = session.snapshot.state.selectedFilePath ?? "(none)";
+  const hunkNumber = session.snapshot.state.selectedFilePath
+    ? session.snapshot.state.selectedHunkIndex + 1
+    : 0;
   return filePath === "(none)" ? filePath : `${filePath} hunk ${hunkNumber}`;
 }
 
@@ -431,7 +432,7 @@ function formatListOutput(sessions: ListedSession[]) {
         }),
         `  focus: ${formatSelectedSummary(session)}`,
         `  files: ${session.fileCount}`,
-        `  comments: ${session.snapshot.liveCommentCount}`,
+        `  comments: ${session.snapshot.state.liveCommentCount}`,
       ].join("\n");
     })
     .join("\n\n")}\n`;
@@ -453,8 +454,8 @@ function formatSessionOutput(session: ListedSession) {
       locationLabel: "Location",
     }),
     `Selected: ${formatSelectedSummary(session)}`,
-    `Agent notes visible: ${session.snapshot.showAgentNotes ? "yes" : "no"}`,
-    `Live comments: ${session.snapshot.liveCommentCount}`,
+    `Agent notes visible: ${session.snapshot.state.showAgentNotes ? "yes" : "no"}`,
+    `Live comments: ${session.snapshot.state.liveCommentCount}`,
     "Files:",
     ...session.files.map(
       (file) =>

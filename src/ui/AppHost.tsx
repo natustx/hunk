@@ -72,8 +72,8 @@ export function AppHost({
         title: nextBootstrap.changeset.title,
         sourceLabel: nextBootstrap.changeset.sourceLabel,
         fileCount: nextBootstrap.changeset.files.length,
-        selectedFilePath: nextSnapshot.selectedFilePath,
-        selectedHunkIndex: nextSnapshot.selectedHunkIndex,
+        selectedFilePath: nextSnapshot.state.selectedFilePath,
+        selectedHunkIndex: nextSnapshot.state.selectedHunkIndex,
       };
     },
     [hostClient],

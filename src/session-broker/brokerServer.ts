@@ -4,7 +4,7 @@ import {
   resolveSessionBrokerConfig,
 } from "./brokerConfig";
 import { SessionBrokerState } from "./brokerState";
-import type { SessionCommandResult } from "./types";
+import type { HunkSessionCommandResult } from "../hunk-session/types";
 import {
   HUNK_SESSION_API_PATH,
   HUNK_SESSION_API_VERSION,
@@ -420,7 +420,7 @@ export function serveSessionBrokerDaemon(
               state.handleCommandResult({
                 requestId: parsed.requestId,
                 ok: parsed.ok,
-                result: parsed.result as SessionCommandResult | undefined,
+                result: parsed.result as HunkSessionCommandResult | undefined,
                 error: typeof parsed.error === "string" ? parsed.error : undefined,
               });
               noteActivity();

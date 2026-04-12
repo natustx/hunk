@@ -7,10 +7,10 @@ import { act } from "react";
 import type { SessionBrokerClient } from "../session-broker/brokerClient";
 import { SESSION_BROKER_REGISTRATION_VERSION } from "../session-broker/brokerWire";
 import type {
-  SessionRegistration,
-  SessionSnapshot,
-  SessionServerMessage,
-} from "../session-broker/types";
+  HunkSessionRegistration,
+  HunkSessionServerMessage,
+  HunkSessionSnapshot,
+} from "../hunk-session/types";
 import type { AppBootstrap, LayoutMode } from "../core/types";
 import { createTestGitAppBootstrap } from "../../test/helpers/app-bootstrap";
 import { createTestDiffFile as buildTestDiffFile, lines } from "../../test/helpers/diff-helpers";
@@ -46,18 +46,20 @@ function createMockHostClient() {
   type Bridge = Parameters<SessionBrokerClient["setBridge"]>[0];
 
   let bridge: Bridge = null;
-  let latestSnapshot: SessionSnapshot | null = null;
-  const registration: SessionRegistration = {
+  let latestSnapshot: HunkSessionSnapshot["state"] | null = null;
+  const registration: HunkSessionRegistration = {
     registrationVersion: SESSION_BROKER_REGISTRATION_VERSION,
     sessionId: "session-1",
     pid: process.pid,
     cwd: process.cwd(),
     repoRoot: process.cwd(),
-    inputKind: "git",
-    title: "repo working tree",
-    sourceLabel: "repo",
     launchedAt: "2026-03-24T00:00:00.000Z",
-    files: [],
+    info: {
+      inputKind: "git",
+      title: "repo working tree",
+      sourceLabel: "repo",
+      files: [],
+    },
   };
   return {
     hostClient: {
@@ -66,14 +68,14 @@ function createMockHostClient() {
       setBridge: (nextBridge: Bridge) => {
         bridge = nextBridge;
       },
-      updateSnapshot: (snapshot: SessionSnapshot) => {
-        latestSnapshot = snapshot;
+      updateSnapshot: (snapshot: HunkSessionSnapshot) => {
+        latestSnapshot = snapshot.state;
       },
     } as unknown as SessionBrokerClient,
     getBridge: () => bridge,
     getLatestSnapshot: () => latestSnapshot,
     navigateToHunk: async (
-      input: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>["input"],
+      input: Extract<HunkSessionServerMessage, { command: "navigate_to_hunk" }>["input"],
     ) => {
       if (!bridge) {
         throw new Error("Expected App to register a bridge before running the test command.");
@@ -339,8 +341,8 @@ async function waitForFrame(
 
 async function waitForSnapshot(
   setup: Awaited<ReturnType<typeof testRender>>,
-  getSnapshot: () => SessionSnapshot | null,
-  predicate: (snapshot: SessionSnapshot) => boolean,
+  getSnapshot: () => HunkSessionSnapshot["state"] | null,
+  predicate: (snapshot: HunkSessionSnapshot["state"]) => boolean,
   attempts = 8,
 ) {
   let snapshot = getSnapshot();

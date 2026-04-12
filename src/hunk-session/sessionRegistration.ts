@@ -3,13 +3,9 @@ import { spawnSync } from "node:child_process";
 import { formatHunkHeader } from "../core/hunkHeader";
 import { hunkLineRange } from "../core/liveComments";
 import type { AppBootstrap } from "../core/types";
-import { resolveSessionTerminalMetadata } from "../session-broker/sessionTerminalMetadata";
 import { SESSION_BROKER_REGISTRATION_VERSION } from "../session-broker/brokerWire";
-import type {
-  SessionRegistration,
-  SessionSnapshot,
-  SessionReviewFile,
-} from "../session-broker/types";
+import { resolveSessionTerminalMetadata } from "../session-broker/sessionTerminalMetadata";
+import type { HunkSessionRegistration, HunkSessionSnapshot, SessionReviewFile } from "./types";
 
 /** Resolve the TTY device path for the current process, if available. */
 function ttyname(): string | undefined {
@@ -35,7 +31,7 @@ function inferRepoRoot(bootstrap: AppBootstrap) {
     : undefined;
 }
 
-/** Convert the loaded changeset into the daemon's file-and-hunk review export model. */
+/** Convert the loaded changeset into the app-owned file-and-hunk review export model. */
 function buildSessionFiles(bootstrap: AppBootstrap): SessionReviewFile[] {
   return bootstrap.changeset.files.map((file) => ({
     id: file.id,
@@ -53,8 +49,8 @@ function buildSessionFiles(bootstrap: AppBootstrap): SessionReviewFile[] {
   }));
 }
 
-/** Build the daemon-facing metadata for one live Hunk TUI session. */
-export function createSessionRegistration(bootstrap: AppBootstrap): SessionRegistration {
+/** Build the broker-facing envelope for one live Hunk review session. */
+export function createSessionRegistration(bootstrap: AppBootstrap): HunkSessionRegistration {
   const terminal = resolveSessionTerminalMetadata({ tty: ttyname() });
 
   return {
@@ -63,46 +59,52 @@ export function createSessionRegistration(bootstrap: AppBootstrap): SessionRegis
     pid: process.pid,
     cwd: process.cwd(),
     repoRoot: inferRepoRoot(bootstrap),
-    inputKind: bootstrap.input.kind,
-    title: bootstrap.changeset.title,
-    sourceLabel: bootstrap.changeset.sourceLabel,
     launchedAt: new Date().toISOString(),
     terminal,
-    files: buildSessionFiles(bootstrap),
+    info: {
+      inputKind: bootstrap.input.kind,
+      title: bootstrap.changeset.title,
+      sourceLabel: bootstrap.changeset.sourceLabel,
+      files: buildSessionFiles(bootstrap),
+    },
   };
 }
 
 /** Rebuild registration metadata after a live session reload while preserving session identity. */
 export function updateSessionRegistration(
-  current: SessionRegistration,
+  current: HunkSessionRegistration,
   bootstrap: AppBootstrap,
-): SessionRegistration {
+): HunkSessionRegistration {
   return {
     ...current,
     registrationVersion: SESSION_BROKER_REGISTRATION_VERSION,
     repoRoot: inferRepoRoot(bootstrap),
-    inputKind: bootstrap.input.kind,
-    title: bootstrap.changeset.title,
-    sourceLabel: bootstrap.changeset.sourceLabel,
-    files: buildSessionFiles(bootstrap),
+    info: {
+      inputKind: bootstrap.input.kind,
+      title: bootstrap.changeset.title,
+      sourceLabel: bootstrap.changeset.sourceLabel,
+      files: buildSessionFiles(bootstrap),
+    },
   };
 }
 
 /** Start with an empty-but-valid snapshot until the UI reports its first selection. */
-export function createInitialSessionSnapshot(bootstrap: AppBootstrap): SessionSnapshot {
+export function createInitialSessionSnapshot(bootstrap: AppBootstrap): HunkSessionSnapshot {
   const firstFile = bootstrap.changeset.files[0];
   const firstHunk = firstFile?.metadata.hunks[0];
   const firstRange = firstHunk ? hunkLineRange(firstHunk) : null;
 
   return {
-    selectedFileId: firstFile?.id,
-    selectedFilePath: firstFile?.path,
-    selectedHunkIndex: 0,
-    selectedHunkOldRange: firstRange?.oldRange,
-    selectedHunkNewRange: firstRange?.newRange,
-    showAgentNotes: bootstrap.initialShowAgentNotes ?? false,
-    liveCommentCount: 0,
-    liveComments: [],
     updatedAt: new Date().toISOString(),
+    state: {
+      selectedFileId: firstFile?.id,
+      selectedFilePath: firstFile?.path,
+      selectedHunkIndex: 0,
+      selectedHunkOldRange: firstRange?.oldRange,
+      selectedHunkNewRange: firstRange?.newRange,
+      showAgentNotes: bootstrap.initialShowAgentNotes ?? false,
+      liveCommentCount: 0,
+      liveComments: [],
+    },
   };
 }

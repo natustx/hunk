@@ -13,7 +13,7 @@ import type {
   NavigatedSelectionResult,
   ReloadedSessionResult,
   RemovedCommentResult,
-} from "./types";
+} from "../hunk-session/types";
 
 function createRegistration(overrides = {}) {
   return createTestSessionRegistration(overrides);

@@ -1,25 +1,12 @@
-import type { CliInput } from "../core/types";
 import type {
   SessionRegistration,
   SessionSnapshot,
-  SessionLiveCommentSummary,
-  SessionReviewFile,
-  SessionReviewHunk,
   SessionTerminalLocation,
   SessionTerminalMetadata,
 } from "./types";
 
-/** Version the live session websocket registration payload separately from the HTTP session API. */
-export const SESSION_BROKER_REGISTRATION_VERSION = 1;
-
-const REVIEW_INPUT_KINDS = new Set<CliInput["kind"]>([
-  "git",
-  "show",
-  "stash-show",
-  "diff",
-  "patch",
-  "difftool",
-]);
+/** Version the live broker registration payload separately from the public session CLI API. */
+export const SESSION_BROKER_REGISTRATION_VERSION = 2;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -46,75 +33,6 @@ function parseNonNegativeInt(value: unknown) {
 /** Parse one required positive integer field from the websocket payload. */
 function parsePositiveInt(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
-}
-
-/** Parse one optional diff-side line range tuple when the payload shape matches. */
-function parseOptionalRange(value: unknown): [number, number] | undefined {
-  if (!Array.isArray(value) || value.length !== 2) {
-    return undefined;
-  }
-
-  const start = parsePositiveInt(value[0]);
-  const end = parsePositiveInt(value[1]);
-  return start !== null && end !== null ? [start, end] : undefined;
-}
-
-/** Parse one registered review hunk from the live session websocket payload. */
-function parseSessionReviewHunk(value: unknown): SessionReviewHunk | null {
-  const record = asRecord(value);
-  if (!record) {
-    return null;
-  }
-
-  const index = parseNonNegativeInt(record.index);
-  const header = parseRequiredString(record.header);
-  if (index === null || header === null) {
-    return null;
-  }
-
-  return {
-    index,
-    header,
-    oldRange: parseOptionalRange(record.oldRange),
-    newRange: parseOptionalRange(record.newRange),
-  };
-}
-
-/** Parse one registered review file from the live session websocket payload. */
-function parseSessionReviewFile(value: unknown): SessionReviewFile | null {
-  const record = asRecord(value);
-  if (!record) {
-    return null;
-  }
-
-  const id = parseRequiredString(record.id);
-  const path = parseRequiredString(record.path);
-  const additions = parseNonNegativeInt(record.additions);
-  const deletions = parseNonNegativeInt(record.deletions);
-  if (id === null || path === null || additions === null || deletions === null) {
-    return null;
-  }
-
-  if (!Array.isArray(record.hunks)) {
-    return null;
-  }
-
-  const hunks = record.hunks.map(parseSessionReviewHunk);
-  if (hunks.some((hunk) => hunk === null)) {
-    return null;
-  }
-
-  return {
-    id,
-    path,
-    previousPath: parseOptionalString(record.previousPath),
-    additions,
-    deletions,
-    // Derive the count from the validated hunks so the daemon has one source of truth.
-    hunkCount: (hunks as SessionReviewHunk[]).length,
-    patch: parseOptionalString(record.patch),
-    hunks: hunks as SessionReviewHunk[],
-  };
 }
 
 /** Parse one terminal location entry, skipping malformed optional metadata. */
@@ -157,56 +75,11 @@ function parseSessionTerminalMetadata(value: unknown): SessionTerminalMetadata |
   };
 }
 
-/** Parse one review input kind supported by live review sessions. */
-function parseReviewInputKind(value: unknown): CliInput["kind"] | null {
-  if (typeof value !== "string" || !REVIEW_INPUT_KINDS.has(value as CliInput["kind"])) {
-    return null;
-  }
-
-  return value as CliInput["kind"];
-}
-
-/** Parse one live comment summary from the session snapshot payload. */
-function parseSessionLiveCommentSummary(value: unknown): SessionLiveCommentSummary | null {
-  const record = asRecord(value);
-  if (!record) {
-    return null;
-  }
-
-  const commentId = parseRequiredString(record.commentId);
-  const filePath = parseRequiredString(record.filePath);
-  const hunkIndex = parseNonNegativeInt(record.hunkIndex);
-  const summary = parseRequiredString(record.summary);
-  const createdAt = parseRequiredString(record.createdAt);
-  const line = parsePositiveInt(record.line);
-  const side = record.side === "old" || record.side === "new" ? record.side : null;
-  if (
-    commentId === null ||
-    filePath === null ||
-    hunkIndex === null ||
-    summary === null ||
-    createdAt === null ||
-    line === null ||
-    side === null
-  ) {
-    return null;
-  }
-
-  return {
-    commentId,
-    filePath,
-    hunkIndex,
-    side,
-    line,
-    summary,
-    rationale: parseOptionalString(record.rationale),
-    author: parseOptionalString(record.author),
-    createdAt,
-  };
-}
-
-/** Parse one live session registration payload from the websocket wire format. */
-export function parseSessionRegistration(value: unknown): SessionRegistration | null {
+/** Parse one broker registration envelope and delegate app-owned info parsing to the caller. */
+export function parseSessionRegistrationEnvelope<Info>(
+  value: unknown,
+  parseInfo: (value: unknown) => Info | null,
+): SessionRegistration<Info> | null {
   const record = asRecord(value);
   if (!record) {
     return null;
@@ -216,26 +89,16 @@ export function parseSessionRegistration(value: unknown): SessionRegistration | 
   const sessionId = parseRequiredString(record.sessionId);
   const pid = parsePositiveInt(record.pid);
   const cwd = parseRequiredString(record.cwd);
-  const inputKind = parseReviewInputKind(record.inputKind);
-  const title = parseRequiredString(record.title);
-  const sourceLabel = parseRequiredString(record.sourceLabel);
   const launchedAt = parseRequiredString(record.launchedAt);
+  const info = parseInfo(record.info);
   if (
     registrationVersion !== SESSION_BROKER_REGISTRATION_VERSION ||
     sessionId === null ||
     pid === null ||
     cwd === null ||
-    inputKind === null ||
-    title === null ||
-    sourceLabel === null ||
     launchedAt === null ||
-    !Array.isArray(record.files)
+    info === null
   ) {
-    return null;
-  }
-
-  const files = record.files.map(parseSessionReviewFile);
-  if (files.some((file) => file === null)) {
     return null;
   }
 
@@ -245,46 +108,38 @@ export function parseSessionRegistration(value: unknown): SessionRegistration | 
     pid,
     cwd,
     repoRoot: parseOptionalString(record.repoRoot),
-    inputKind,
-    title,
-    sourceLabel,
     launchedAt,
     terminal: parseSessionTerminalMetadata(record.terminal),
-    files: files as SessionReviewFile[],
+    info,
   };
 }
 
-/** Parse one live session snapshot payload from the websocket wire format. */
-export function parseSessionSnapshot(value: unknown): SessionSnapshot | null {
+/** Parse one broker snapshot envelope and delegate app-owned state parsing to the caller. */
+export function parseSessionSnapshotEnvelope<State>(
+  value: unknown,
+  parseState: (value: unknown) => State | null,
+): SessionSnapshot<State> | null {
   const record = asRecord(value);
   if (!record) {
     return null;
   }
 
-  const selectedHunkIndex = parseNonNegativeInt(record.selectedHunkIndex);
-  const showAgentNotes = typeof record.showAgentNotes === "boolean" ? record.showAgentNotes : null;
   const updatedAt = parseRequiredString(record.updatedAt);
-  if (selectedHunkIndex === null || showAgentNotes === null || updatedAt === null) {
+  const state = parseState(record.state);
+  if (updatedAt === null || state === null) {
     return null;
   }
 
-  if (!Array.isArray(record.liveComments)) {
-    return null;
-  }
-
-  const liveComments = record.liveComments
-    .map(parseSessionLiveCommentSummary)
-    .filter((comment): comment is SessionLiveCommentSummary => comment !== null);
   return {
-    selectedFileId: parseOptionalString(record.selectedFileId),
-    selectedFilePath: parseOptionalString(record.selectedFilePath),
-    selectedHunkIndex,
-    selectedHunkOldRange: parseOptionalRange(record.selectedHunkOldRange),
-    selectedHunkNewRange: parseOptionalRange(record.selectedHunkNewRange),
-    showAgentNotes,
-    // Count only the validated summaries we actually keep so badges and lists stay consistent.
-    liveCommentCount: liveComments.length,
-    liveComments,
     updatedAt,
+    state,
   };
 }
+
+export const brokerWireParsers = {
+  asRecord,
+  parseNonNegativeInt,
+  parseOptionalString,
+  parsePositiveInt,
+  parseRequiredString,
+};

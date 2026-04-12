@@ -6,11 +6,11 @@ import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
   ClearedCommentsResult,
+  HunkSessionServerMessage,
   ReloadedSessionResult,
   RemovedCommentResult,
   SessionLiveCommentSummary,
-  SessionServerMessage,
-} from "../../session-broker/types";
+} from "../../hunk-session/types";
 import type { ReviewController } from "./useReviewController";
 
 /** Bridge one live Hunk review session to the local session daemon. */
@@ -49,14 +49,14 @@ export function useHunkSessionBridge({
   showAgentNotes: boolean;
 }) {
   const navigateToHunkSelection = useCallback(
-    async (message: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>) =>
+    async (message: Extract<HunkSessionServerMessage, { command: "navigate_to_hunk" }>) =>
       navigateToLocation(message.input),
     [navigateToLocation],
   );
 
   const applyIncomingComment = useCallback(
     async (
-      message: Extract<SessionServerMessage, { command: "comment" }>,
+      message: Extract<HunkSessionServerMessage, { command: "comment" }>,
     ): Promise<AppliedCommentResult> => {
       const result = addLiveComment(message.input, `mcp:${message.requestId}`, {
         reveal: message.input.reveal,
@@ -73,7 +73,7 @@ export function useHunkSessionBridge({
 
   const applyIncomingCommentBatch = useCallback(
     async (
-      message: Extract<SessionServerMessage, { command: "comment_batch" }>,
+      message: Extract<HunkSessionServerMessage, { command: "comment_batch" }>,
     ): Promise<AppliedCommentBatchResult> => {
       const result = addLiveCommentBatch(message.input.comments, message.requestId, {
         revealMode: message.input.revealMode,
@@ -89,21 +89,21 @@ export function useHunkSessionBridge({
   );
 
   const reloadIncomingSession = useCallback(
-    async (message: Extract<SessionServerMessage, { command: "reload_session" }>) =>
+    async (message: Extract<HunkSessionServerMessage, { command: "reload_session" }>) =>
       reloadSession(message.input.nextInput, { sourcePath: message.input.sourcePath }),
     [reloadSession],
   );
 
   const removeIncomingComment = useCallback(
     async (
-      message: Extract<SessionServerMessage, { command: "remove_comment" }>,
+      message: Extract<HunkSessionServerMessage, { command: "remove_comment" }>,
     ): Promise<RemovedCommentResult> => removeLiveComment(message.input.commentId),
     [removeLiveComment],
   );
 
   const clearIncomingComments = useCallback(
     async (
-      message: Extract<SessionServerMessage, { command: "clear_comments" }>,
+      message: Extract<HunkSessionServerMessage, { command: "clear_comments" }>,
     ): Promise<ClearedCommentsResult> => clearLiveComments(message.input.filePath),
     [clearLiveComments],
   );
@@ -139,15 +139,17 @@ export function useHunkSessionBridge({
     const selectedRange = selectedHunk ? hunkLineRange(selectedHunk) : undefined;
 
     hostClient?.updateSnapshot({
-      selectedFileId: selectedFile?.id,
-      selectedFilePath: selectedFile?.path,
-      selectedHunkIndex,
-      selectedHunkOldRange: selectedRange?.oldRange,
-      selectedHunkNewRange: selectedRange?.newRange,
-      showAgentNotes,
-      liveCommentCount,
-      liveComments: liveCommentSummaries,
       updatedAt: new Date().toISOString(),
+      state: {
+        selectedFileId: selectedFile?.id,
+        selectedFilePath: selectedFile?.path,
+        selectedHunkIndex,
+        selectedHunkOldRange: selectedRange?.oldRange,
+        selectedHunkNewRange: selectedRange?.newRange,
+        showAgentNotes,
+        liveCommentCount,
+        liveComments: liveCommentSummaries,
+      },
     });
   }, [
     hostClient,

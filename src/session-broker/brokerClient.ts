@@ -2,15 +2,15 @@ import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
   ClearedCommentsResult,
-  SessionRegistration,
-  SessionSnapshot,
+  HunkSessionClientMessage,
+  HunkSessionCommandResult,
+  HunkSessionRegistration,
+  HunkSessionServerMessage,
+  HunkSessionSnapshot,
   NavigatedSelectionResult,
   ReloadedSessionResult,
   RemovedCommentResult,
-  SessionClientMessage,
-  SessionCommandResult,
-  SessionServerMessage,
-} from "./types";
+} from "../hunk-session/types";
 import {
   SESSION_BROKER_SOCKET_PATH,
   resolveSessionBrokerConfig,
@@ -36,22 +36,22 @@ const INCOMPATIBLE_SESSION_CLOSE_MESSAGE =
 
 interface SessionAppBridge {
   applyComment: (
-    message: Extract<SessionServerMessage, { command: "comment" }>,
+    message: Extract<HunkSessionServerMessage, { command: "comment" }>,
   ) => Promise<AppliedCommentResult>;
   applyCommentBatch: (
-    message: Extract<SessionServerMessage, { command: "comment_batch" }>,
+    message: Extract<HunkSessionServerMessage, { command: "comment_batch" }>,
   ) => Promise<AppliedCommentBatchResult>;
   navigateToHunk: (
-    message: Extract<SessionServerMessage, { command: "navigate_to_hunk" }>,
+    message: Extract<HunkSessionServerMessage, { command: "navigate_to_hunk" }>,
   ) => Promise<NavigatedSelectionResult>;
   reloadSession: (
-    message: Extract<SessionServerMessage, { command: "reload_session" }>,
+    message: Extract<HunkSessionServerMessage, { command: "reload_session" }>,
   ) => Promise<ReloadedSessionResult>;
   removeComment: (
-    message: Extract<SessionServerMessage, { command: "remove_comment" }>,
+    message: Extract<HunkSessionServerMessage, { command: "remove_comment" }>,
   ) => Promise<RemovedCommentResult>;
   clearComments: (
-    message: Extract<SessionServerMessage, { command: "clear_comments" }>,
+    message: Extract<HunkSessionServerMessage, { command: "clear_comments" }>,
   ) => Promise<ClearedCommentsResult>;
 }
 
@@ -59,7 +59,7 @@ interface SessionAppBridge {
 export class SessionBrokerClient {
   private websocket: WebSocket | null = null;
   private bridge: SessionAppBridge | null = null;
-  private queuedMessages: SessionServerMessage[] = [];
+  private queuedMessages: HunkSessionServerMessage[] = [];
   private reconnectTimer: Timer | null = null;
   private heartbeatTimer: Timer | null = null;
   private stopped = false;
@@ -67,8 +67,8 @@ export class SessionBrokerClient {
   private lastConnectionWarning: string | null = null;
 
   constructor(
-    private registration: SessionRegistration,
-    private snapshot: SessionSnapshot,
+    private registration: HunkSessionRegistration,
+    private snapshot: HunkSessionSnapshot,
   ) {}
 
   start() {
@@ -110,7 +110,7 @@ export class SessionBrokerClient {
     return this.registration;
   }
 
-  replaceSession(registration: SessionRegistration, snapshot: SessionSnapshot) {
+  replaceSession(registration: HunkSessionRegistration, snapshot: HunkSessionSnapshot) {
     this.registration = registration;
     this.snapshot = snapshot;
     this.send({
@@ -196,7 +196,7 @@ export class SessionBrokerClient {
     void this.flushQueuedMessages();
   }
 
-  updateSnapshot(snapshot: SessionSnapshot) {
+  updateSnapshot(snapshot: HunkSessionSnapshot) {
     this.snapshot = snapshot;
     this.send({
       type: "snapshot",
@@ -229,9 +229,9 @@ export class SessionBrokerClient {
         return;
       }
 
-      let parsed: SessionServerMessage;
+      let parsed: HunkSessionServerMessage;
       try {
-        parsed = JSON.parse(event.data) as SessionServerMessage;
+        parsed = JSON.parse(event.data) as HunkSessionServerMessage;
       } catch {
         return;
       }
@@ -297,7 +297,7 @@ export class SessionBrokerClient {
     this.heartbeatTimer = null;
   }
 
-  private send(message: SessionClientMessage) {
+  private send(message: HunkSessionClientMessage) {
     if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -305,7 +305,7 @@ export class SessionBrokerClient {
     this.websocket.send(JSON.stringify(message));
   }
 
-  private async handleServerMessage(message: SessionServerMessage) {
+  private async handleServerMessage(message: HunkSessionServerMessage) {
     if (!this.bridge) {
       this.queuedMessages.push(message);
       return;
@@ -329,7 +329,7 @@ export class SessionBrokerClient {
     }
   }
 
-  private dispatchCommand(message: SessionServerMessage): Promise<SessionCommandResult> {
+  private dispatchCommand(message: HunkSessionServerMessage): Promise<HunkSessionCommandResult> {
     if (!this.bridge) {
       throw new Error("Session bridge is not connected.");
     }

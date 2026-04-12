@@ -1,59 +1,47 @@
 import { describe, expect, test } from "bun:test";
 import {
   SESSION_BROKER_REGISTRATION_VERSION,
-  parseSessionRegistration,
-  parseSessionSnapshot,
+  parseSessionRegistrationEnvelope,
+  parseSessionSnapshotEnvelope,
 } from "./brokerWire";
 
-function createValidComment(overrides: Record<string, unknown> = {}) {
-  return {
-    commentId: "comment-1",
-    filePath: "src/example.ts",
-    hunkIndex: 0,
-    side: "new",
-    line: 4,
-    summary: "Review note",
-    createdAt: "2026-03-22T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
-describe("session websocket wire parsing", () => {
-  test("snapshot comment counts only include validated comment summaries", () => {
-    const snapshot = parseSessionSnapshot({
-      selectedFileId: "file-1",
-      selectedFilePath: "src/example.ts",
-      selectedHunkIndex: 0,
-      showAgentNotes: true,
-      liveCommentCount: 5,
-      liveComments: [
-        createValidComment(),
-        {
-          filePath: "src/example.ts",
-          summary: "Missing comment id and line.",
-        },
-      ],
-      updatedAt: "2026-03-22T00:00:00.000Z",
-    });
-
-    expect(snapshot).not.toBeNull();
-    expect(snapshot?.liveComments).toHaveLength(1);
-    expect(snapshot?.liveCommentCount).toBe(1);
-  });
-
+describe("session broker wire parsing", () => {
   test("registration requires the current websocket registration version", () => {
     expect(
-      parseSessionRegistration({
-        registrationVersion: SESSION_BROKER_REGISTRATION_VERSION - 1,
-        sessionId: "session-1",
-        pid: 123,
-        cwd: "/repo",
-        inputKind: "git",
-        title: "repo working tree",
-        sourceLabel: "/repo",
-        launchedAt: "2026-03-22T00:00:00.000Z",
-        files: [],
-      }),
+      parseSessionRegistrationEnvelope(
+        {
+          registrationVersion: SESSION_BROKER_REGISTRATION_VERSION - 1,
+          sessionId: "session-1",
+          pid: 123,
+          cwd: "/repo",
+          launchedAt: "2026-03-22T00:00:00.000Z",
+          info: { ok: true },
+        },
+        (value) => (value && typeof value === "object" ? value : null),
+      ),
     ).toBeNull();
+  });
+
+  test("snapshot parsing delegates opaque app state validation", () => {
+    const snapshot = parseSessionSnapshotEnvelope(
+      {
+        updatedAt: "2026-03-22T00:00:00.000Z",
+        state: { mode: "review", selected: 2 },
+      },
+      (value) => {
+        if (!value || typeof value !== "object") {
+          return null;
+        }
+
+        const mode = (value as { mode?: unknown }).mode;
+        const selected = (value as { selected?: unknown }).selected;
+        return mode === "review" && typeof selected === "number" ? { mode, selected } : null;
+      },
+    );
+
+    expect(snapshot).toEqual({
+      updatedAt: "2026-03-22T00:00:00.000Z",
+      state: { mode: "review", selected: 2 },
+    });
   });
 });

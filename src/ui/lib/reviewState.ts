@@ -12,7 +12,7 @@ import type {
   LiveComment,
   NavigateToHunkToolInput,
   SelectedHunkSummary,
-} from "../../session-broker/types";
+} from "../../hunk-session/types";
 import {
   buildSidebarEntries,
   filterReviewFiles,
