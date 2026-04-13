@@ -1,10 +1,9 @@
 import type {
-  HunkSessionClientMessage,
-  HunkSessionCommandResult,
-  HunkSessionRegistration,
-  HunkSessionServerMessage,
-  HunkSessionSnapshot,
-} from "../hunk-session/types";
+  SessionClientMessage,
+  SessionRegistration,
+  SessionServerMessage,
+  SessionSnapshot,
+} from "./types";
 import {
   SESSION_BROKER_SOCKET_PATH,
   resolveSessionBrokerConfig,
@@ -28,15 +27,23 @@ const INCOMPATIBLE_SESSION_CLOSE_REASON_PREFIX = "Incompatible session ";
 const INCOMPATIBLE_SESSION_CLOSE_MESSAGE =
   "This window is too old for the refreshed session broker daemon. Restart the window to reconnect.";
 
-interface SessionAppBridge {
-  dispatchCommand: (message: HunkSessionServerMessage) => Promise<HunkSessionCommandResult>;
+interface SessionAppBridge<
+  ServerMessage extends SessionServerMessage = SessionServerMessage,
+  Result = unknown,
+> {
+  dispatchCommand: (message: ServerMessage) => Promise<Result>;
 }
 
 /** Keep one running app session registered with the local session broker daemon. */
-export class SessionBrokerClient {
+export class SessionBrokerClient<
+  Info = unknown,
+  State = unknown,
+  ServerMessage extends SessionServerMessage = SessionServerMessage,
+  Result = unknown,
+> {
   private websocket: WebSocket | null = null;
-  private bridge: SessionAppBridge | null = null;
-  private queuedMessages: HunkSessionServerMessage[] = [];
+  private bridge: SessionAppBridge<ServerMessage, Result> | null = null;
+  private queuedMessages: ServerMessage[] = [];
   private reconnectTimer: Timer | null = null;
   private heartbeatTimer: Timer | null = null;
   private stopped = false;
@@ -44,8 +51,8 @@ export class SessionBrokerClient {
   private lastConnectionWarning: string | null = null;
 
   constructor(
-    private registration: HunkSessionRegistration,
-    private snapshot: HunkSessionSnapshot,
+    private registration: SessionRegistration<Info>,
+    private snapshot: SessionSnapshot<State>,
   ) {}
 
   start() {
@@ -87,7 +94,7 @@ export class SessionBrokerClient {
     return this.registration;
   }
 
-  replaceSession(registration: HunkSessionRegistration, snapshot: HunkSessionSnapshot) {
+  replaceSession(registration: SessionRegistration<Info>, snapshot: SessionSnapshot<State>) {
     this.registration = registration;
     this.snapshot = snapshot;
     this.send({
@@ -168,12 +175,12 @@ export class SessionBrokerClient {
     }
   }
 
-  setBridge(bridge: SessionAppBridge | null) {
+  setBridge(bridge: SessionAppBridge<ServerMessage, Result> | null) {
     this.bridge = bridge;
     void this.flushQueuedMessages();
   }
 
-  updateSnapshot(snapshot: HunkSessionSnapshot) {
+  updateSnapshot(snapshot: SessionSnapshot<State>) {
     this.snapshot = snapshot;
     this.send({
       type: "snapshot",
@@ -206,9 +213,9 @@ export class SessionBrokerClient {
         return;
       }
 
-      let parsed: HunkSessionServerMessage;
+      let parsed: ServerMessage;
       try {
-        parsed = JSON.parse(event.data) as HunkSessionServerMessage;
+        parsed = JSON.parse(event.data) as ServerMessage;
       } catch {
         return;
       }
@@ -274,7 +281,7 @@ export class SessionBrokerClient {
     this.heartbeatTimer = null;
   }
 
-  private send(message: HunkSessionClientMessage) {
+  private send(message: SessionClientMessage<Info, State, Result>) {
     if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -282,7 +289,7 @@ export class SessionBrokerClient {
     this.websocket.send(JSON.stringify(message));
   }
 
-  private async handleServerMessage(message: HunkSessionServerMessage) {
+  private async handleServerMessage(message: ServerMessage) {
     if (!this.bridge) {
       this.queuedMessages.push(message);
       return;

@@ -14,6 +14,12 @@ import {
   createInitialSessionSnapshot,
   createSessionRegistration,
 } from "./hunk-session/sessionRegistration";
+import type {
+  HunkSessionCommandResult,
+  HunkSessionInfo,
+  HunkSessionServerMessage,
+  HunkSessionState,
+} from "./hunk-session/types";
 import { runSessionCommand } from "./session/commands";
 
 async function main() {
@@ -45,10 +51,12 @@ async function main() {
   }
 
   const { bootstrap, cliInput, controllingTerminal } = startupPlan;
-  const hostClient = new SessionBrokerClient(
-    createSessionRegistration(bootstrap),
-    createInitialSessionSnapshot(bootstrap),
-  );
+  const hostClient = new SessionBrokerClient<
+    HunkSessionInfo,
+    HunkSessionState,
+    HunkSessionServerMessage,
+    HunkSessionCommandResult
+  >(createSessionRegistration(bootstrap), createInitialSessionSnapshot(bootstrap));
   hostClient.start();
 
   const renderer = await createCliRenderer({

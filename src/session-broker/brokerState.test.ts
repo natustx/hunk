@@ -1,37 +1,208 @@
 import { describe, expect, test } from "bun:test";
 import {
-  createTestListedSession,
-  createTestSessionRegistration,
-  createTestSessionSnapshot,
-} from "../../test/helpers/session-daemon-fixtures";
-import { SessionBrokerState, resolveSessionTarget } from "./brokerState";
-import type {
-  AppliedCommentBatchResult,
-  AppliedCommentResult,
-  ClearedCommentsResult,
-  NavigatedSelectionResult,
-  ReloadedSessionResult,
-  RemovedCommentResult,
-} from "../hunk-session/types";
+  SessionBrokerState,
+  resolveSessionTarget,
+  type SessionBrokerListedSession,
+  type SessionBrokerViewAdapter,
+} from "./brokerState";
+import {
+  SESSION_BROKER_REGISTRATION_VERSION,
+  brokerWireParsers,
+  parseSessionRegistrationEnvelope,
+  parseSessionSnapshotEnvelope,
+} from "./brokerWire";
+import type { SessionRegistration, SessionServerMessage, SessionSnapshot } from "./types";
 
-function createRegistration(overrides = {}) {
-  return createTestSessionRegistration(overrides);
+interface TestSessionInfo {
+  title: string;
+  files: string[];
 }
 
-function createSnapshot(overrides = {}) {
-  return createTestSessionSnapshot(overrides);
+interface TestSessionState {
+  selectedIndex: number;
+  noteCount: number;
 }
 
-describe("Hunk session daemon state", () => {
+interface TestListedSession extends SessionBrokerListedSession {
+  pid: number;
+  launchedAt: string;
+  fileCount: number;
+  snapshot: SessionSnapshot<TestSessionState>;
+}
+
+interface TestSelectedContext {
+  sessionId: string;
+  selectedIndex: number;
+}
+
+interface TestSessionReview {
+  sessionId: string;
+  title: string;
+  fileCount: number;
+  includePatch: boolean;
+}
+
+interface TestCommentSummary {
+  id: string;
+  filePath?: string;
+}
+
+type TestSessionRegistration = SessionRegistration<TestSessionInfo>;
+type TestSessionSnapshot = SessionSnapshot<TestSessionState>;
+
+type TestServerMessage =
+  | SessionServerMessage<"annotate", { filePath: string; summary: string; reveal?: boolean }>
+  | SessionServerMessage<"reload_view", { ref: string }>
+  | SessionServerMessage<"clear_annotations", { filePath?: string }>;
+
+type TestCommandResult =
+  | { kind: "annotated"; annotationId: string }
+  | { kind: "reloaded"; ref: string }
+  | { kind: "cleared"; removedCount: number };
+
+function parseTestInfo(value: unknown): TestSessionInfo | null {
+  const record = brokerWireParsers.asRecord(value);
+  if (!record || !Array.isArray(record.files)) {
+    return null;
+  }
+
+  const title = brokerWireParsers.parseRequiredString(record.title);
+  const files = record.files.filter((entry): entry is string => typeof entry === "string");
+  if (title === null || files.length !== record.files.length) {
+    return null;
+  }
+
+  return {
+    title,
+    files,
+  };
+}
+
+function parseTestState(value: unknown): TestSessionState | null {
+  const record = brokerWireParsers.asRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const selectedIndex = brokerWireParsers.parseNonNegativeInt(record.selectedIndex);
+  const noteCount = brokerWireParsers.parseNonNegativeInt(record.noteCount);
+  if (selectedIndex === null || noteCount === null) {
+    return null;
+  }
+
+  return {
+    selectedIndex,
+    noteCount,
+  };
+}
+
+const testBrokerView: SessionBrokerViewAdapter<
+  TestSessionInfo,
+  TestSessionState,
+  TestListedSession,
+  TestSelectedContext,
+  TestSessionReview,
+  TestCommentSummary
+> = {
+  parseRegistration: (value) => parseSessionRegistrationEnvelope(value, parseTestInfo),
+  parseSnapshot: (value) => parseSessionSnapshotEnvelope(value, parseTestState),
+  buildListedSession: (entry) => ({
+    sessionId: entry.registration.sessionId,
+    pid: entry.registration.pid,
+    cwd: entry.registration.cwd,
+    repoRoot: entry.registration.repoRoot,
+    launchedAt: entry.registration.launchedAt,
+    title: entry.registration.info.title,
+    fileCount: entry.registration.info.files.length,
+    snapshot: entry.snapshot,
+  }),
+  buildSelectedContext: (session) => ({
+    sessionId: session.sessionId,
+    selectedIndex: session.snapshot.state.selectedIndex,
+  }),
+  buildSessionReview: (entry, options) => ({
+    sessionId: entry.registration.sessionId,
+    title: entry.registration.info.title,
+    fileCount: entry.registration.info.files.length,
+    includePatch: options.includePatch ?? false,
+  }),
+  listComments: (_session, filter) => [{ id: "note-1", filePath: filter.filePath }],
+};
+
+function createState() {
+  return new SessionBrokerState<
+    TestSessionInfo,
+    TestSessionState,
+    TestServerMessage,
+    TestCommandResult,
+    TestListedSession,
+    TestSelectedContext,
+    TestSessionReview,
+    TestCommentSummary
+  >(testBrokerView);
+}
+
+function createRegistration(
+  overrides: Partial<TestSessionRegistration> & { info?: Partial<TestSessionInfo> } = {},
+): TestSessionRegistration {
+  return {
+    registrationVersion: SESSION_BROKER_REGISTRATION_VERSION,
+    sessionId: "session-1",
+    pid: 123,
+    cwd: "/repo",
+    repoRoot: "/repo",
+    launchedAt: "2026-03-22T00:00:00.000Z",
+    ...overrides,
+    info: {
+      title: "repo working tree",
+      files: ["src/example.ts"],
+      ...overrides.info,
+    },
+  };
+}
+
+function createSnapshot(
+  overrides: Partial<TestSessionSnapshot["state"]> & { updatedAt?: string } = {},
+): TestSessionSnapshot {
+  const { updatedAt = "2026-03-22T00:00:00.000Z", ...stateOverrides } = overrides;
+
+  return {
+    updatedAt,
+    state: {
+      selectedIndex: 0,
+      noteCount: 0,
+      ...stateOverrides,
+    },
+  };
+}
+
+function createListedSession(overrides: Partial<TestListedSession> = {}): TestListedSession {
+  const snapshot = overrides.snapshot ?? createSnapshot();
+
+  return {
+    sessionId: "session-1",
+    pid: 123,
+    cwd: "/repo",
+    repoRoot: "/repo",
+    launchedAt: "2026-03-22T00:00:00.000Z",
+    title: "repo working tree",
+    fileCount: 1,
+    snapshot,
+    ...overrides,
+  };
+}
+
+describe("session broker state", () => {
   test("resolves one target session by session id, session path, repo root, or sole-session fallback", () => {
-    const one = [createTestListedSession()];
+    const one = [createListedSession()];
     const two = [
-      createTestListedSession(),
-      createTestListedSession({
+      createListedSession(),
+      createListedSession({
         sessionId: "session-2",
         cwd: "/other-session",
         repoRoot: "/repo",
-        snapshot: { ...createSnapshot(), updatedAt: "2026-03-22T00:00:01.000Z" },
+        title: "repo secondary view",
+        snapshot: createSnapshot({ updatedAt: "2026-03-22T00:00:01.000Z" }),
       }),
     ];
 
@@ -49,12 +220,12 @@ describe("Hunk session daemon state", () => {
 
   test("keeps session-path matching tied to the live session cwd", () => {
     const sessions = [
-      createTestListedSession({
+      createListedSession({
         sessionId: "session-f",
         cwd: "/live-session",
         repoRoot: "/source-f",
       }),
-      createTestListedSession({
+      createListedSession({
         sessionId: "session-a",
         cwd: "/other-session",
         repoRoot: "/source-a",
@@ -67,8 +238,31 @@ describe("Hunk session daemon state", () => {
     expect(resolveSessionTarget(sessions, { repoRoot: "/source-a" }).sessionId).toBe("session-a");
   });
 
+  test("delegates session projections to the app adapter", () => {
+    const state = createState();
+    const socket = {
+      send() {},
+    };
+
+    state.registerSession(socket, createRegistration(), createSnapshot({ noteCount: 2 }));
+
+    expect(state.getSelectedContext({ sessionId: "session-1" })).toEqual({
+      sessionId: "session-1",
+      selectedIndex: 0,
+    });
+    expect(state.getSessionReview({ sessionId: "session-1" }, { includePatch: true })).toEqual({
+      sessionId: "session-1",
+      title: "repo working tree",
+      fileCount: 1,
+      includePatch: true,
+    });
+    expect(state.listComments({ sessionId: "session-1" }, { filePath: "src/example.ts" })).toEqual([
+      { id: "note-1", filePath: "src/example.ts" },
+    ]);
+  });
+
   test("ignores incompatible session registrations so listings stay usable after upgrades", () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const socket = {
       send() {},
     };
@@ -87,7 +281,7 @@ describe("Hunk session daemon state", () => {
   });
 
   test("reports invalid snapshot updates without replacing the last valid selection", () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const socket = {
       send() {},
     };
@@ -95,25 +289,25 @@ describe("Hunk session daemon state", () => {
     state.registerSession(socket, createRegistration(), createSnapshot());
 
     const result = state.updateSnapshot("session-1", {
-      selectedHunkIndex: "oops",
+      selectedIndex: "oops",
     });
 
     expect(result).toBe("invalid");
-    expect(state.getSession({ sessionId: "session-1" }).snapshot.state.selectedHunkIndex).toBe(0);
+    expect(state.getSession({ sessionId: "session-1" }).snapshot.state.selectedIndex).toBe(0);
   });
 
   test("reports missing sessions separately from invalid snapshot payloads", () => {
-    const state = new SessionBrokerState();
+    const state = createState();
 
     expect(
       state.updateSnapshot("missing-session", {
-        selectedHunkIndex: 0,
+        selectedIndex: 0,
       }),
     ).toBe("not-found");
   });
 
-  test("routes a comment command to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
+  test("routes one opaque broker command to the live session and resolves the async result", async () => {
+    const state = createState();
     const sent: string[] = [];
     const socket = {
       send(data: string) {
@@ -123,264 +317,36 @@ describe("Hunk session daemon state", () => {
 
     state.registerSession(socket, createRegistration(), createSnapshot());
 
-    const pending = state.sendComment({
-      sessionId: "session-1",
+    const pending = state.dispatchCommand<{ kind: "annotated"; annotationId: string }, "annotate">({
+      selector: {
+        sessionId: "session-1",
+      },
+      command: "annotate",
+      input: {
+        filePath: "src/example.ts",
+        summary: "Review note",
+        reveal: true,
+      },
+      timeoutMessage: "Timed out waiting for the session to apply the note.",
+    });
+
+    expect(sent).toHaveLength(1);
+    const outgoing = JSON.parse(sent[0]!) as {
+      requestId: string;
+      command: string;
+      input: { filePath: string; summary: string; reveal?: boolean };
+    };
+
+    expect(outgoing.command).toBe("annotate");
+    expect(outgoing.input).toEqual({
       filePath: "src/example.ts",
-      side: "new",
-      line: 4,
       summary: "Review note",
       reveal: true,
     });
 
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-    };
-
-    const result: AppliedCommentResult = {
-      commentId: "comment-1",
-      fileId: "file-1",
-      filePath: "src/example.ts",
-      hunkIndex: 0,
-      side: "new",
-      line: 4,
-    };
-
-    state.handleCommandResult({
-      requestId: outgoing.requestId,
-      ok: true,
-      result,
-    });
-
-    await expect(pending).resolves.toEqual(result);
-  });
-
-  test("routes comment-batch commands to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
-    const sent: string[] = [];
-    const socket = {
-      send(data: string) {
-        sent.push(data);
-      },
-    };
-
-    state.registerSession(socket, createRegistration(), createSnapshot());
-
-    const pending = state.sendCommentBatch({
-      sessionId: "session-1",
-      comments: [
-        {
-          filePath: "src/example.ts",
-          hunkIndex: 0,
-          summary: "Review note 1",
-        },
-        {
-          filePath: "src/example.ts",
-          hunkIndex: 0,
-          summary: "Review note 2",
-        },
-      ],
-      revealMode: "none",
-    });
-
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-      command: string;
-    };
-    expect(outgoing.command).toBe("comment_batch");
-
-    const result: AppliedCommentBatchResult = {
-      applied: [
-        {
-          commentId: "comment-1",
-          fileId: "file-1",
-          filePath: "src/example.ts",
-          hunkIndex: 0,
-          side: "new",
-          line: 4,
-        },
-        {
-          commentId: "comment-2",
-          fileId: "file-1",
-          filePath: "src/example.ts",
-          hunkIndex: 0,
-          side: "new",
-          line: 9,
-        },
-      ],
-    };
-
-    state.handleCommandResult({
-      requestId: outgoing.requestId,
-      ok: true,
-      result,
-    });
-
-    await expect(pending).resolves.toEqual(result);
-  });
-
-  test("routes navigation commands to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
-    const sent: string[] = [];
-    const socket = {
-      send(data: string) {
-        sent.push(data);
-      },
-    };
-
-    state.registerSession(socket, createRegistration(), createSnapshot());
-
-    const pending = state.sendNavigateToHunk({
-      sessionId: "session-1",
-      filePath: "src/example.ts",
-      hunkIndex: 0,
-    });
-
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-      command: string;
-    };
-    expect(outgoing.command).toBe("navigate_to_hunk");
-
-    const result: NavigatedSelectionResult = {
-      fileId: "file-1",
-      filePath: "src/example.ts",
-      hunkIndex: 0,
-      selectedHunk: {
-        index: 0,
-        oldRange: [1, 2],
-        newRange: [1, 4],
-      },
-    };
-
-    state.handleCommandResult({
-      requestId: outgoing.requestId,
-      ok: true,
-      result,
-    });
-
-    await expect(pending).resolves.toEqual(result);
-  });
-
-  test("routes reload commands to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
-    const sent: string[] = [];
-    const socket = {
-      send(data: string) {
-        sent.push(data);
-      },
-    };
-
-    state.registerSession(socket, createRegistration(), createSnapshot());
-
-    const pending = state.sendReloadSession({
-      sessionId: "session-1",
-      nextInput: {
-        kind: "show",
-        ref: "HEAD~1",
-        options: {},
-      },
-    });
-
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-      command: string;
-      input: { nextInput: { kind: string; ref?: string; options?: Record<string, unknown> } };
-    };
-    expect(outgoing.command).toBe("reload_session");
-    expect(outgoing.input.nextInput).toEqual({
-      kind: "show",
-      ref: "HEAD~1",
-      options: {},
-    });
-
-    const result: ReloadedSessionResult = {
-      sessionId: "session-1",
-      inputKind: "show",
-      title: "repo show HEAD~1",
-      sourceLabel: "/repo",
-      fileCount: 1,
-      selectedFilePath: "src/example.ts",
-      selectedHunkIndex: 0,
-    };
-
-    state.handleCommandResult({
-      requestId: outgoing.requestId,
-      ok: true,
-      result,
-    });
-
-    await expect(pending).resolves.toEqual(result);
-  });
-
-  test("routes remove-comment commands to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
-    const sent: string[] = [];
-    const socket = {
-      send(data: string) {
-        sent.push(data);
-      },
-    };
-
-    state.registerSession(socket, createRegistration(), createSnapshot());
-
-    const pending = state.sendRemoveComment({
-      sessionId: "session-1",
-      commentId: "comment-1",
-    });
-
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-      command: string;
-    };
-    expect(outgoing.command).toBe("remove_comment");
-
-    const result: RemovedCommentResult = {
-      commentId: "comment-1",
-      removed: true,
-      remainingCommentCount: 0,
-    };
-
-    state.handleCommandResult({
-      requestId: outgoing.requestId,
-      ok: true,
-      result,
-    });
-
-    await expect(pending).resolves.toEqual(result);
-  });
-
-  test("routes clear-comments commands to the live session and resolves the async result", async () => {
-    const state = new SessionBrokerState();
-    const sent: string[] = [];
-    const socket = {
-      send(data: string) {
-        sent.push(data);
-      },
-    };
-
-    state.registerSession(socket, createRegistration(), createSnapshot());
-
-    const pending = state.sendClearComments({
-      sessionId: "session-1",
-      filePath: "src/example.ts",
-    });
-
-    expect(sent).toHaveLength(1);
-    const outgoing = JSON.parse(sent[0]!) as {
-      requestId: string;
-      command: string;
-    };
-    expect(outgoing.command).toBe("clear_comments");
-
-    const result: ClearedCommentsResult = {
-      removedCount: 2,
-      remainingCommentCount: 0,
-      filePath: "src/example.ts",
+    const result = {
+      kind: "annotated" as const,
+      annotationId: "annotation-1",
     };
 
     state.handleCommandResult({
@@ -393,18 +359,22 @@ describe("Hunk session daemon state", () => {
   });
 
   test("rejects in-flight commands when the session disconnects", async () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const socket = {
       send() {},
     };
 
     state.registerSession(socket, createRegistration(), createSnapshot());
-    const pending = state.sendComment({
-      sessionId: "session-1",
-      filePath: "src/example.ts",
-      side: "new",
-      line: 4,
-      summary: "Review note",
+    const pending = state.dispatchCommand<{ kind: "annotated"; annotationId: string }, "annotate">({
+      selector: {
+        sessionId: "session-1",
+      },
+      command: "annotate",
+      input: {
+        filePath: "src/example.ts",
+        summary: "Review note",
+      },
+      timeoutMessage: "Timed out waiting for the session to apply the note.",
     });
 
     state.unregisterSocket(socket);
@@ -413,7 +383,7 @@ describe("Hunk session daemon state", () => {
   });
 
   test("rejects in-flight commands when a session reconnects on a new socket", async () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const originalSocket = {
       send() {},
     };
@@ -422,12 +392,16 @@ describe("Hunk session daemon state", () => {
     };
 
     state.registerSession(originalSocket, createRegistration(), createSnapshot());
-    const pending = state.sendComment({
-      sessionId: "session-1",
-      filePath: "src/example.ts",
-      side: "new",
-      line: 4,
-      summary: "Review note",
+    const pending = state.dispatchCommand<{ kind: "annotated"; annotationId: string }, "annotate">({
+      selector: {
+        sessionId: "session-1",
+      },
+      command: "annotate",
+      input: {
+        filePath: "src/example.ts",
+        summary: "Review note",
+      },
+      timeoutMessage: "Timed out waiting for the session to apply the note.",
     });
 
     state.registerSession(
@@ -441,7 +415,7 @@ describe("Hunk session daemon state", () => {
   });
 
   test("rejects commands immediately when the live session socket cannot accept them", async () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const socket = {
       send() {
         throw new Error("socket closed");
@@ -451,19 +425,23 @@ describe("Hunk session daemon state", () => {
     state.registerSession(socket, createRegistration(), createSnapshot());
 
     await expect(
-      state.sendComment({
-        sessionId: "session-1",
-        filePath: "src/example.ts",
-        side: "new",
-        line: 4,
-        summary: "Review note",
+      state.dispatchCommand<{ kind: "annotated"; annotationId: string }, "annotate">({
+        selector: {
+          sessionId: "session-1",
+        },
+        command: "annotate",
+        input: {
+          filePath: "src/example.ts",
+          summary: "Review note",
+        },
+        timeoutMessage: "Timed out waiting for the session to apply the note.",
       }),
     ).rejects.toThrow("socket closed");
     expect(state.getPendingCommandCount()).toBe(0);
   });
 
   test("prunes stale sessions and rejects their in-flight commands", async () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const sent: string[] = [];
     const socket = {
       send(data: string) {
@@ -472,12 +450,16 @@ describe("Hunk session daemon state", () => {
     };
 
     state.registerSession(socket, createRegistration(), createSnapshot());
-    const pending = state.sendComment({
-      sessionId: "session-1",
-      filePath: "src/example.ts",
-      side: "new",
-      line: 4,
-      summary: "Review note",
+    const pending = state.dispatchCommand<{ kind: "annotated"; annotationId: string }, "annotate">({
+      selector: {
+        sessionId: "session-1",
+      },
+      command: "annotate",
+      input: {
+        filePath: "src/example.ts",
+        summary: "Review note",
+      },
+      timeoutMessage: "Timed out waiting for the session to apply the note.",
     });
 
     expect(sent).toHaveLength(1);
@@ -492,7 +474,7 @@ describe("Hunk session daemon state", () => {
   });
 
   test("heartbeats keep an otherwise idle session from being pruned", () => {
-    const state = new SessionBrokerState();
+    const state = createState();
     const socket = {
       send() {},
     };

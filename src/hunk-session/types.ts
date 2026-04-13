@@ -1,4 +1,5 @@
 import type { AgentAnnotation, CliInput } from "../core/types";
+import type { SessionBrokerClient } from "../session-broker/brokerClient";
 import type {
   SessionClientMessage,
   SessionRegistration,
@@ -224,6 +225,13 @@ export type HunkSessionCommandResult =
 export type HunkSessionClientMessage = SessionClientMessage<
   HunkSessionInfo,
   HunkSessionState,
+  HunkSessionCommandResult
+>;
+
+export type HunkSessionBrokerClient = SessionBrokerClient<
+  HunkSessionInfo,
+  HunkSessionState,
+  HunkSessionServerMessage,
   HunkSessionCommandResult
 >;
 

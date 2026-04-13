@@ -1,9 +1,12 @@
 import { useEffect, useMemo } from "react";
 import type { CliInput, DiffFile } from "../../core/types";
 import { hunkLineRange } from "../../core/liveComments";
-import { SessionBrokerClient } from "../../session-broker/brokerClient";
 import { createHunkSessionBridge } from "../../hunk-session/bridge";
-import type { ReloadedSessionResult, SessionLiveCommentSummary } from "../../hunk-session/types";
+import type {
+  HunkSessionBrokerClient,
+  ReloadedSessionResult,
+  SessionLiveCommentSummary,
+} from "../../hunk-session/types";
 import type { ReviewController } from "./useReviewController";
 
 /** Bridge one live Hunk review session to the local session daemon. */
@@ -26,7 +29,7 @@ export function useHunkSessionBridge({
   addLiveComment: ReviewController["addLiveComment"];
   addLiveCommentBatch: ReviewController["addLiveCommentBatch"];
   clearLiveComments: ReviewController["clearLiveComments"];
-  hostClient?: SessionBrokerClient;
+  hostClient?: HunkSessionBrokerClient;
   liveCommentCount: number;
   liveCommentSummaries: SessionLiveCommentSummary[];
   navigateToLocation: ReviewController["navigateToLocation"];

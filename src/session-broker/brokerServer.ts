@@ -3,7 +3,10 @@ import {
   SESSION_BROKER_SOCKET_PATH,
   resolveSessionBrokerConfig,
 } from "./brokerConfig";
-import { SessionBrokerState } from "./brokerState";
+import {
+  createHunkSessionBrokerState,
+  type HunkSessionBrokerState,
+} from "../hunk-session/brokerAdapter";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -108,7 +111,7 @@ async function parseJsonRequest(request: Request) {
   }
 }
 
-async function handleSessionApiRequest(state: SessionBrokerState, request: Request) {
+async function handleSessionApiRequest(state: HunkSessionBrokerState, request: Request) {
   if (request.method !== "POST") {
     return jsonError("Session API requests must use POST.", 405);
   }
@@ -265,7 +268,7 @@ export function serveSessionBrokerDaemon(
   const staleSessionTtlMs = options.staleSessionTtlMs ?? DEFAULT_STALE_SESSION_TTL_MS;
   const staleSessionSweepIntervalMs =
     options.staleSessionSweepIntervalMs ?? DEFAULT_STALE_SESSION_SWEEP_INTERVAL_MS;
-  const state = new SessionBrokerState();
+  const state = createHunkSessionBrokerState();
   const startedAt = Date.now();
   let resolveStopped: (() => void) | null = null;
   const stopped = new Promise<void>((resolve) => {

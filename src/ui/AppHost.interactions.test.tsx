@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { describe, expect, mock, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act } from "react";
-import type { SessionBrokerClient } from "../session-broker/brokerClient";
 import { SESSION_BROKER_REGISTRATION_VERSION } from "../session-broker/brokerWire";
 import type {
+  HunkSessionBrokerClient,
   HunkSessionRegistration,
   HunkSessionServerMessage,
   HunkSessionSnapshot,
@@ -43,7 +43,7 @@ function createNumberedAssignmentLines(start: number, count: number, valueOffset
 }
 
 function createMockHostClient() {
-  type Bridge = Parameters<SessionBrokerClient["setBridge"]>[0];
+  type Bridge = Parameters<HunkSessionBrokerClient["setBridge"]>[0];
 
   let bridge: Bridge = null;
   let latestSnapshot: HunkSessionSnapshot["state"] | null = null;
@@ -71,7 +71,7 @@ function createMockHostClient() {
       updateSnapshot: (snapshot: HunkSessionSnapshot) => {
         latestSnapshot = snapshot.state;
       },
-    } as unknown as SessionBrokerClient,
+    } as unknown as HunkSessionBrokerClient,
     getBridge: () => bridge,
     getLatestSnapshot: () => latestSnapshot,
     navigateToHunk: async (

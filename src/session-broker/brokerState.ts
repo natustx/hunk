@@ -1,38 +1,15 @@
 import { randomUUID } from "node:crypto";
-import {
-  buildHunkSessionReview,
-  buildListedHunkSession,
-  buildSelectedHunkSessionContext,
-  listHunkSessionComments,
-} from "../hunk-session/projections";
+import { matchesSessionSelector, type SelectableSession } from "./selectors";
 import type {
-  AppliedCommentBatchResult,
-  AppliedCommentResult,
-  ClearedCommentsResult,
-  ClearCommentsToolInput,
-  CommentBatchToolInput,
-  CommentToolInput,
-  HunkSessionCommandResult,
-  HunkSessionRegistration,
-  HunkSessionServerMessage,
-  HunkSessionSnapshot,
-  ListedSession,
-  NavigateToHunkToolInput,
-  NavigatedSelectionResult,
-  ReloadSessionToolInput,
-  ReloadedSessionResult,
-  RemoveCommentToolInput,
-  RemovedCommentResult,
-  SelectedSessionContext,
-  SessionReview,
-} from "../hunk-session/types";
-import { parseSessionRegistration, parseSessionSnapshot } from "../hunk-session/wire";
-import { matchesSessionSelector } from "./selectors";
-import type { SessionTargetInput } from "./types";
+  SessionRegistration,
+  SessionServerMessage,
+  SessionSnapshot,
+  SessionTargetInput,
+} from "./types";
 
-interface PendingCommand {
+interface PendingCommand<Result> {
   sessionId: string;
-  resolve: (result: HunkSessionCommandResult) => void;
+  resolve: (result: Result) => void;
   reject: (error: Error) => void;
   timeout: Timer;
 }
@@ -41,12 +18,44 @@ interface DaemonSessionSocket {
   send(data: string): unknown;
 }
 
-interface SessionEntry {
-  registration: HunkSessionRegistration;
-  snapshot: HunkSessionSnapshot;
+/** Hold one live broker session plus the socket that owns it. */
+export interface SessionBrokerEntry<Info = unknown, State = unknown> {
+  registration: SessionRegistration<Info>;
+  snapshot: SessionSnapshot<State>;
   socket: DaemonSessionSocket;
   connectedAt: string;
   lastSeenAt: string;
+}
+
+/** Describe the minimum projected session shape shared by broker selectors and listings. */
+export interface SessionBrokerListedSession extends SelectableSession {
+  title: string;
+  snapshot: {
+    updatedAt: string;
+  };
+}
+
+/**
+ * Delegate app-owned parsing and projection to the adapter so the broker core never imports one
+ * specific app's registration, snapshot, or review payload modules.
+ */
+export interface SessionBrokerViewAdapter<
+  Info,
+  State,
+  ListedSession extends SessionBrokerListedSession,
+  SelectedContext,
+  SessionReview,
+  SessionCommentSummary,
+> {
+  parseRegistration: (value: unknown) => SessionRegistration<Info> | null;
+  parseSnapshot: (value: unknown) => SessionSnapshot<State> | null;
+  buildListedSession: (entry: SessionBrokerEntry<Info, State>) => ListedSession;
+  buildSelectedContext: (session: ListedSession) => SelectedContext;
+  buildSessionReview: (
+    entry: SessionBrokerEntry<Info, State>,
+    options: { includePatch?: boolean },
+  ) => SessionReview;
+  listComments: (session: ListedSession, filter: { filePath?: string }) => SessionCommentSummary[];
 }
 
 export type UpdateSnapshotResult = "updated" | "invalid" | "not-found";
@@ -57,12 +66,17 @@ export interface SessionTargetSelector {
   repoRoot?: string;
 }
 
-function describeSessionChoices(sessions: ListedSession[]) {
+function describeSessionChoices<ListedSession extends SessionBrokerListedSession>(
+  sessions: ListedSession[],
+) {
   return sessions.map((session) => `${session.sessionId} (${session.title})`).join(", ");
 }
 
 /** Resolve which live session one external command should target. */
-export function resolveSessionTarget(sessions: ListedSession[], selector: SessionTargetSelector) {
+export function resolveSessionTarget<ListedSession extends SessionBrokerListedSession>(
+  sessions: ListedSession[],
+  selector: SessionTargetSelector,
+) {
   if (selector.sessionId) {
     const matched = sessions.find((session) => matchesSessionSelector(session, selector));
     if (!matched) {
@@ -122,14 +136,34 @@ export function resolveSessionTarget(sessions: ListedSession[], selector: Sessio
 }
 
 /** Track registered sessions and route broker commands onto the correct live app instance. */
-export class SessionBrokerState {
-  private sessions = new Map<string, SessionEntry>();
+export class SessionBrokerState<
+  Info = unknown,
+  State = unknown,
+  ServerMessage extends SessionServerMessage = SessionServerMessage,
+  CommandResult = unknown,
+  ListedSession extends SessionBrokerListedSession = SessionBrokerListedSession,
+  SelectedContext = unknown,
+  SessionReview = unknown,
+  SessionCommentSummary = unknown,
+> {
+  private sessions = new Map<string, SessionBrokerEntry<Info, State>>();
   private sessionIdsBySocket = new Map<DaemonSessionSocket, string>();
-  private pendingCommands = new Map<string, PendingCommand>();
+  private pendingCommands = new Map<string, PendingCommand<CommandResult>>();
+
+  constructor(
+    private view: SessionBrokerViewAdapter<
+      Info,
+      State,
+      ListedSession,
+      SelectedContext,
+      SessionReview,
+      SessionCommentSummary
+    >,
+  ) {}
 
   listSessions(): ListedSession[] {
     return [...this.sessions.values()]
-      .map(buildListedHunkSession)
+      .map((entry) => this.view.buildListedSession(entry))
       .sort((left, right) => right.snapshot.updatedAt.localeCompare(left.snapshot.updatedAt));
   }
 
@@ -142,15 +176,15 @@ export class SessionBrokerState {
     selector: SessionTargetSelector,
     options: { includePatch?: boolean } = {},
   ): SessionReview {
-    return buildHunkSessionReview(this.getSessionEntry(selector), options);
+    return this.view.buildSessionReview(this.getSessionEntry(selector), options);
   }
 
-  getSelectedContext(selector: SessionTargetSelector): SelectedSessionContext {
-    return buildSelectedHunkSessionContext(this.getSession(selector));
+  getSelectedContext(selector: SessionTargetSelector): SelectedContext {
+    return this.view.buildSelectedContext(this.getSession(selector));
   }
 
   listComments(selector: SessionTargetSelector, filter: { filePath?: string } = {}) {
-    return listHunkSessionComments(this.getSession(selector), filter);
+    return this.view.listComments(this.getSession(selector), filter);
   }
 
   getSessionCount() {
@@ -162,8 +196,8 @@ export class SessionBrokerState {
   }
 
   registerSession(socket: DaemonSessionSocket, registrationInput: unknown, snapshotInput: unknown) {
-    const registration = parseSessionRegistration(registrationInput);
-    const snapshot = parseSessionSnapshot(snapshotInput);
+    const registration = this.view.parseRegistration(registrationInput);
+    const snapshot = this.view.parseSnapshot(snapshotInput);
     if (!registration || !snapshot) {
       const previousSessionId = this.sessionIdsBySocket.get(socket);
       if (previousSessionId) {
@@ -210,7 +244,7 @@ export class SessionBrokerState {
       return "not-found";
     }
 
-    const snapshot = parseSessionSnapshot(snapshotInput);
+    const snapshot = this.view.parseSnapshot(snapshotInput);
     if (!snapshot) {
       return "invalid";
     }
@@ -265,10 +299,7 @@ export class SessionBrokerState {
   }
 
   /** Dispatch one app-owned command through the generic broker transport. */
-  dispatchCommand<
-    ResultType extends HunkSessionCommandResult,
-    CommandName extends HunkSessionServerMessage["command"],
-  >({
+  dispatchCommand<ResultType extends CommandResult, CommandName extends ServerMessage["command"]>({
     selector,
     command,
     input,
@@ -277,7 +308,7 @@ export class SessionBrokerState {
   }: {
     selector: SessionTargetInput;
     command: CommandName;
-    input: Extract<HunkSessionServerMessage, { command: CommandName }>["input"];
+    input: Extract<ServerMessage, { command: CommandName }>["input"];
     timeoutMessage: string;
     timeoutMs?: number;
   }) {
@@ -311,7 +342,7 @@ export class SessionBrokerState {
           requestId,
           command,
           input,
-        } as Extract<HunkSessionServerMessage, { command: CommandName }>;
+        } as Extract<ServerMessage, { command: CommandName }>;
 
         entry.socket.send(JSON.stringify(message));
       } catch (error) {
@@ -326,91 +357,10 @@ export class SessionBrokerState {
     });
   }
 
-  /** Keep temporary Hunk-oriented helpers while callers migrate onto generic dispatch. */
-  sendComment(input: CommentToolInput) {
-    return this.dispatchCommand<AppliedCommentResult, "comment">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "comment",
-      input,
-      timeoutMessage: "Timed out waiting for the session to apply the comment.",
-    });
-  }
-
-  sendCommentBatch(input: CommentBatchToolInput) {
-    return this.dispatchCommand<AppliedCommentBatchResult, "comment_batch">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "comment_batch",
-      input,
-      timeoutMessage: "Timed out waiting for the session to apply the comment batch.",
-      timeoutMs: 30_000,
-    });
-  }
-
-  sendNavigateToHunk(input: NavigateToHunkToolInput) {
-    return this.dispatchCommand<NavigatedSelectionResult, "navigate_to_hunk">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "navigate_to_hunk",
-      input,
-      timeoutMessage: "Timed out waiting for the session to navigate to the requested hunk.",
-    });
-  }
-
-  sendReloadSession(input: ReloadSessionToolInput) {
-    return this.dispatchCommand<ReloadedSessionResult, "reload_session">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "reload_session",
-      input,
-      timeoutMessage: "Timed out waiting for the session to reload the requested contents.",
-      timeoutMs: 30_000,
-    });
-  }
-
-  sendRemoveComment(input: RemoveCommentToolInput) {
-    return this.dispatchCommand<RemovedCommentResult, "remove_comment">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "remove_comment",
-      input,
-      timeoutMessage: "Timed out waiting for the session to remove the requested comment.",
-    });
-  }
-
-  sendClearComments(input: ClearCommentsToolInput) {
-    return this.dispatchCommand<ClearedCommentsResult, "clear_comments">({
-      selector: {
-        sessionId: input.sessionId,
-        sessionPath: input.sessionPath,
-        repoRoot: input.repoRoot,
-      },
-      command: "clear_comments",
-      input,
-      timeoutMessage: "Timed out waiting for the session to clear the requested comments.",
-    });
-  }
-
   handleCommandResult(message: {
     requestId: string;
     ok: boolean;
-    result?: HunkSessionCommandResult;
+    result?: CommandResult;
     error?: string;
   }) {
     const pending = this.pendingCommands.get(message.requestId);
@@ -421,8 +371,8 @@ export class SessionBrokerState {
     clearTimeout(pending.timeout);
     this.pendingCommands.delete(message.requestId);
 
-    if (message.ok && message.result) {
-      pending.resolve(message.result);
+    if (message.ok) {
+      pending.resolve(message.result as CommandResult);
       return;
     }
 
